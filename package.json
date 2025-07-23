@@ -1,0 +1,68 @@
+{
+  "name": "datacollector",
+  "version": "1.0.0",
+  "description": "AI-powered agent that scours the internet to find and download relevant content based on user queries",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "npm run dev --workspace=packages/backend",
+    "dev:frontend": "npm run dev --workspace=packages/frontend",
+    "build": "npm run build --workspaces",
+    "build:backend": "npm run build --workspace=packages/backend",
+    "build:frontend": "npm run build --workspace=packages/frontend",
+    "test": "npm run test --workspaces",
+    "test:backend": "npm run test --workspace=packages/backend",
+    "test:frontend": "npm run test --workspace=packages/frontend",
+    "lint": "npm run lint --workspaces",
+    "lint:fix": "npm run lint:fix --workspaces",
+    "clean": "npm run clean --workspaces && rm -rf node_modules",
+    "setup": "npm install && npm run setup:infrastructure",
+    "setup:infrastructure": "docker-compose -f infrastructure/docker/docker-compose.yml up -d",
+    "stop:infrastructure": "docker-compose -f infrastructure/docker/docker-compose.yml down",
+    "reset:infrastructure": "npm run stop:infrastructure && docker-compose -f infrastructure/docker/docker-compose.yml down -v && npm run setup:infrastructure",
+    "logs": "docker-compose -f infrastructure/docker/docker-compose.yml logs -f",
+    "typecheck": "npm run typecheck --workspaces"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "concurrently": "^8.2.0",
+    "eslint": "^8.45.0",
+    "eslint-config-prettier": "^8.8.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "husky": "^8.0.3",
+    "lint-staged": "^13.2.3",
+    "prettier": "^3.0.0",
+    "typescript": "^5.1.6"
+  },
+  "keywords": [
+    "ai",
+    "data-collection",
+    "web-scraping",
+    "search",
+    "embeddings",
+    "opensearch",
+    "langchain",
+    "react",
+    "node.js",
+    "typescript"
+  ],
+  "author": "DataCollector Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  }
+} 

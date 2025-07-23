@@ -1,0 +1,171 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database for job state management and metadata
+  postgres:
+    image: postgres:15
+    container_name: datacollector-postgres
+    environment:
+      POSTGRES_DB: datacollector
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - datacollector-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis for message queue and caching
+  redis:
+    image: redis:7-alpine
+    container_name: datacollector-redis
+    command: redis-server --appendonly yes --requirepass redis123
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - datacollector-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # OpenSearch for full-text search
+  opensearch:
+    image: opensearchproject/opensearch:2.9.0
+    container_name: datacollector-opensearch
+    environment:
+      - cluster.name=datacollector-cluster
+      - node.name=datacollector-node
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - "DISABLE_INSTALL_DEMO_CONFIG=true"
+      - "DISABLE_SECURITY_PLUGIN=true"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+      - ./opensearch/opensearch.yml:/usr/share/opensearch/config/opensearch.yml
+    networks:
+      - datacollector-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # OpenSearch Dashboards for visualization and management
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2.9.0
+    container_name: datacollector-opensearch-dashboards
+    environment:
+      - "OPENSEARCH_HOSTS=http://opensearch:9200"
+      - "DISABLE_SECURITY_DASHBOARDS_PLUGIN=true"
+    ports:
+      - "5601:5601"
+    networks:
+      - datacollector-network
+    depends_on:
+      - opensearch
+    restart: unless-stopped
+
+  # ChromaDB for vector embeddings
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: datacollector-chromadb
+    environment:
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_HTTP_PORT=8000
+      - CHROMA_SERVER_CORS_ALLOW_ORIGINS=["*"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - chromadb_data:/chroma/chroma
+    networks:
+      - datacollector-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/v1/heartbeat || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PgAdmin for PostgreSQL management (optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: datacollector-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@datacollector.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "8080:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - datacollector-network
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    profiles:
+      - management
+
+  # Redis Commander for Redis management (optional)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: datacollector-redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379:1:redis123
+      - HTTP_USER=admin
+      - HTTP_PASSWORD=admin123
+    ports:
+      - "8081:8081"
+    networks:
+      - datacollector-network
+    depends_on:
+      - redis
+    restart: unless-stopped
+    profiles:
+      - management
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  opensearch_data:
+    driver: local
+  chromadb_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  datacollector-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16 
