@@ -17,6 +17,8 @@ DataCollector is an intelligent system that combines web scraping, AI analysis, 
 
 ## 🏗️ Architecture
 
+> 📖 **Detailed Documentation**: See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for comprehensive architectural patterns and conventions.
+
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   React Frontend │    │  Express.js API │    │  Job Queue      │
@@ -41,6 +43,12 @@ DataCollector is an intelligent system that combines web scraping, AI analysis, 
 │  - Metadata     │    │  - Hybrid Search│    │  - arXiv        │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
+
+### 🎯 **Key Architectural Principles**
+- **Clear Separation**: `types/` for interfaces, `models/` for database entities
+- **Job Processing Pattern**: Generic `JobProcessor` + specific job implementations
+- **Asynchronous Processing**: Background jobs with real-time progress updates
+- **State Management**: Comprehensive job lifecycle tracking with state validation
 
 ## 🚀 Quick Start
 
