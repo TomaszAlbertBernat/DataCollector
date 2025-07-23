@@ -50,6 +50,8 @@ DataCollector is an intelligent system that combines web scraping, AI analysis, 
 - Docker and Docker Compose
 - OpenAI API key
 
+> **⚠️ Missing Prerequisites?** See our [detailed setup guide](docs/SETUP.md) for Windows installation instructions.
+
 ### Installation
 
 1. **Clone the repository**
@@ -80,7 +82,12 @@ DataCollector is an intelligent system that combines web scraping, AI analysis, 
    docker-compose -f infrastructure/docker/docker-compose.yml ps
    ```
 
-6. **Start the development servers**
+6. **Test the infrastructure** (recommended)
+   ```bash
+   npm run test:infrastructure
+   ```
+
+7. **Start the development servers**
    ```bash
    # Terminal 1: Start backend
    npm run dev:backend
@@ -89,7 +96,7 @@ DataCollector is an intelligent system that combines web scraping, AI analysis, 
    npm run dev:frontend
    ```
 
-7. **Access the application**
+8. **Access the application**
    - Frontend: http://localhost:3000
    - Backend API: http://localhost:3001
    - OpenSearch Dashboard: http://localhost:5601
@@ -183,6 +190,7 @@ npm run test:frontend        # Run frontend tests
 npm run setup:infrastructure  # Start Docker services
 npm run stop:infrastructure   # Stop Docker services
 npm run reset:infrastructure  # Reset all data and restart
+npm run test:infrastructure   # Test all infrastructure services
 npm run logs                 # View Docker logs
 
 # Maintenance
