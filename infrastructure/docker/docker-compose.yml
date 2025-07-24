@@ -107,11 +107,6 @@ services:
     networks:
       - datacollector-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/v1/heartbeat || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   # PgAdmin for PostgreSQL management (optional)
   pgadmin:

@@ -1,5 +1,5 @@
 # OpenSearch configuration for DataCollector
-# Optimized for document search and full-text indexing
+# Simplified configuration for Windows development
 
 cluster.name: datacollector-cluster
 node.name: datacollector-node
@@ -7,18 +7,16 @@ node.name: datacollector-node
 # Network settings
 network.host: 0.0.0.0
 http.port: 9200
-transport.tcp.port: 9300
 
 # Discovery settings
 discovery.type: single-node
-cluster.initial_master_nodes: ["datacollector-node"]
 
 # Path settings
 path.data: /usr/share/opensearch/data
 path.logs: /usr/share/opensearch/logs
 
-# Memory settings
-bootstrap.memory_lock: true
+# Memory settings - disabled for Windows compatibility
+bootstrap.memory_lock: false
 
 # Security settings (disabled for development)
 plugins.security.disabled: true
@@ -63,7 +61,6 @@ action.auto_create_index: true
 
 # Logging
 logger.level: INFO
-rootLogger.level: INFO
 
 # Performance settings
 indices.recovery.max_bytes_per_sec: 40mb

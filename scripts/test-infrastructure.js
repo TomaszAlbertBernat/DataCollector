@@ -71,8 +71,7 @@ const services = [
     description: 'Vector embeddings database',
     host: 'localhost',
     port: 8000,
-    type: 'http',
-    path: '/api/v1/heartbeat',
+    type: 'tcp',
     icon: '🧠'
   },
   {
