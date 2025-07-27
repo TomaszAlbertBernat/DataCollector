@@ -5,7 +5,7 @@
  * These are used for request validation, response formatting, and API documentation.
  */
 
-import { JobStatus, JobType, JobData, JobStatistics, JobQueryParams } from './job';
+import { JobStatus, JobType, JobStatistics, JobQueryParams } from './job';
 
 // Common API response wrapper
 export interface ApiResponse<T = any> {
@@ -262,14 +262,14 @@ export interface DocumentDownloadRequest {
 // ===================
 
 // Create collection request
-export interface CreateCollectionRequest {
+export interface CreateDocumentCollectionRequest {
   name: string;
   description?: string;
   documentIds?: string[];
 }
 
 // Collection response
-export interface CollectionResponse {
+export interface DocumentCollectionResponse {
   id: string;
   name: string;
   description?: string;

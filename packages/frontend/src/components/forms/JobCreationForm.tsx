@@ -10,7 +10,7 @@ import {
   XMarkIcon 
 } from '@heroicons/react/24/outline'
 import { jobsApi } from '@/services/api'
-import { useJobStore } from '@/stores/jobStore'
+// import { useJobStore } from '@/stores/jobStore' // TODO: Implement when job store is ready
 import { useNotificationStore } from '@/stores/notificationStore'
 import type { CreateCollectionRequest } from '@/types/api'
 
@@ -59,7 +59,7 @@ const availableFileTypes = [
 
 export function JobCreationForm({ onSuccess, onCancel }: JobCreationFormProps) {
   const [showAdvanced, setShowAdvanced] = useState(false)
-  const { addJob } = useJobStore()
+  // const { addJob } = useJobStore() // TODO: Implement when job store is ready
   const { addNotification } = useNotificationStore()
 
   const {

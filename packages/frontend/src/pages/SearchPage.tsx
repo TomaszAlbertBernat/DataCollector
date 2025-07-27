@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+// import { useQuery } from '@tanstack/react-query' // TODO: Implement when search functionality is ready
 import { useSearchParams } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
 import { 
@@ -12,9 +12,9 @@ import {
   ArrowDownTrayIcon,
   EyeIcon
 } from '@heroicons/react/24/outline'
-import { searchApi } from '@/services/api'
+// import { searchApi } from '@/services/api' // TODO: Implement when search functionality is ready
 import { DocumentViewer } from '@/components/ui/DocumentViewer'
-import type { SearchRequest, SearchResult, SearchFilters, DocumentResponse } from '@/types/api'
+import type { SearchResult, SearchFilters, DocumentResponse } from '@/types/api'
 
 // Mock search results for development
 const mockSearchResults: SearchResult[] = [

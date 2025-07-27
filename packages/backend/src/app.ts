@@ -20,6 +20,8 @@ import { JobStateManager } from './services/queue/JobStateManager';
 import { JobProcessor } from './services/queue/JobProcessor';
 import { CollectionJob } from './services/jobs/CollectionJob';
 import { createJobRouter } from './routes/jobs';
+import { createSearchRouter } from './routes/search';
+import { createUploadRouter } from './routes/upload';
 import { JobType } from './types/job';
 
 // Import types
@@ -63,6 +65,7 @@ let scraperManager: any = null;
 let jobQueue: JobQueue | null = null;
 let jobStateManager: JobStateManager | null = null;
 let jobProcessor: JobProcessor | null = null;
+let searchEngine: any = null;
 
 // Initialize PostgreSQL connection pool
 const initializePostgreSQL = async (): Promise<Pool> => {
@@ -231,6 +234,26 @@ const initializeJobServices = async () => {
   } catch (error) {
     logger.error('Failed to initialize job services:', error);
     throw error;
+  }
+};
+
+// Initialize search services
+const initializeSearchServices = async () => {
+  try {
+    // For now, we'll create a placeholder search engine
+    // In a real implementation, you'd initialize OpenSearch and ChromaDB
+    logger.info('Search services placeholder - will be implemented with OpenSearch and ChromaDB');
+    
+    // TODO: Initialize actual search services
+    // const openSearchService = createOpenSearchService(openSearchConfig, logger);
+    // const chromaDBService = createChromaDBService(chromaDBConfig, logger);
+    // searchEngine = createHybridSearchEngine(openSearchService, chromaDBService, searchConfig, logger);
+    // await searchEngine.initialize();
+    
+  } catch (error) {
+    logger.error('Failed to initialize search services:', error);
+    // Don't throw error, just log it and continue without search services
+    searchEngine = null;
   }
 };
 
@@ -444,12 +467,44 @@ app.use('/api/jobs', (req, res, next) => {
   return jobRouter(req, res, next);
 });
 
-// Placeholder routes for future implementation
-app.use('/api/search', (req, res) => {
-  res.status(501).json({ 
-    error: 'Search routes not implemented yet',
-    message: 'Search endpoints will be implemented in Phase 6'
+// Search routes
+app.use('/api/search', (req, res, next) => {
+  if (!searchEngine) {
+    return res.status(503).json({
+      success: false,
+      error: {
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Search services are not yet initialized'
+      },
+      timestamp: new Date().toISOString()
+    });
+  }
+  
+  const searchRouter = createSearchRouter({
+    searchEngine,
+    logger
   });
+  
+  return searchRouter(req, res, next);
+});
+
+app.use('/api/upload', (req, res, next) => {
+  if (!jobQueue || !jobStateManager) {
+    return res.status(503).json({
+      success: false,
+      error: {
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Upload services are not yet initialized'
+      },
+      timestamp: new Date().toISOString()
+    });
+  }
+  const uploadRouter = createUploadRouter({
+    jobQueue,
+    stateManager: jobStateManager,
+    logger
+  });
+  return uploadRouter(req, res, next);
 });
 
 app.use('/api/documents', (req, res) => {
@@ -570,6 +625,7 @@ const startServer = async () => {
     await initializeAIServices();
     await initializeScrapingServices();
     await initializeJobServices();
+    await initializeSearchServices();
 
     const PORT = process.env.PORT || 3001;
     

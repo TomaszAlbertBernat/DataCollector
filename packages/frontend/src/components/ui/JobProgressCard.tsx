@@ -2,13 +2,13 @@ import { useEffect } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import {
   PlayIcon,
-  PauseIcon,
+  // PauseIcon, // TODO: Implement when pause functionality is ready
   StopIcon,
   EyeIcon,
   TrashIcon,
   ClockIcon,
   CheckCircleIcon,
-  ExclamationTriangleIcon,
+  // ExclamationTriangleIcon, // TODO: Implement when error handling is ready
   XCircleIcon,
 } from '@heroicons/react/24/outline'
 import { useWebSocket } from '@/hooks/useWebSocket'

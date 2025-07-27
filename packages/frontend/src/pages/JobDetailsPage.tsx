@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-hot-toast'
@@ -17,10 +17,10 @@ import {
 } from '@heroicons/react/24/outline'
 import { formatDistanceToNow, format } from 'date-fns'
 import { JobProgressCard } from '@/components/ui/JobProgressCard'
-import { useJobStore } from '@/stores/jobStore'
+// import { useJobStore } from '@/stores/jobStore' // TODO: Implement when job store is ready
 import { useNotificationStore } from '@/stores/notificationStore'
 import { jobsApi } from '@/services/api'
-import type { JobWithClientState, JobStatus } from '@/types/api'
+import type { JobStatus } from '@/types/api'
 
 // Mock job logs for development
 const mockJobLogs = [

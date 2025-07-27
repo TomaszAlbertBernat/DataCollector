@@ -191,6 +191,9 @@ data/processed/
 data/raw/
 !data/examples/
 
+# Transcription data
+Transcriptions_All/
+
 # File storage
 uploads/
 downloads/

@@ -204,9 +204,9 @@ export function JobsPage() {
       )}
 
       {/* Error State */}
-      {error && (
+      {error ? (
         <div className="card p-6 text-center">
-          <p className="text-red-600 mb-4">Failed to load jobs: {String(error)}</p>
+          <p className="text-red-600 mb-4">Failed to load jobs: {(error as Error)?.message || 'Unknown error'}</p>
           <button 
             onClick={() => queryClient.invalidateQueries({ queryKey: ['jobs'] })}
             className="btn-primary"
@@ -214,10 +214,10 @@ export function JobsPage() {
             Retry
           </button>
         </div>
-      )}
+      ) : null}
 
       {/* Jobs List */}
-      {!isLoading && !error && (
+      {!isLoading && !error ? (
         <div>
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-medium text-gray-900">
@@ -262,7 +262,7 @@ export function JobsPage() {
             </div>
           )}
         </div>
-      )}
+      ) : null}
     </div>
   )
 } 
