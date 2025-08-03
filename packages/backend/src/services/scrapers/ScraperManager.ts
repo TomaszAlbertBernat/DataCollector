@@ -2,13 +2,17 @@ import winston from 'winston';
 
 import { BaseScraper, ScrapingConfig, SearchResult, createDefaultScrapingConfig } from './BaseScraper';
 import { GoogleScholarScraper, GoogleScholarOptions } from './GoogleScholarScraper';
+import { PubMedScraper } from './PubMedScraper';
+import { ArXivScraper } from './ArXivScraper';
+import { EnvironmentConfig } from '../../config/environment';
+
+type ScraperName = 'google_scholar' | 'pubmed' | 'arxiv';
 
 export interface ScraperManagerConfig {
   scrapers: {
     googleScholar: ScrapingConfig;
-    // Add more scrapers here as they're implemented
-    // pubmed: ScrapingConfig;
-    // arxiv: ScrapingConfig;
+    pubmed: ScrapingConfig;
+    arxiv: ScrapingConfig;
   };
   globalRateLimit: number; // Global requests per minute across all scrapers
   maxConcurrentScrapers: number;
@@ -91,12 +95,31 @@ export class ScraperManager {
         this.logger.info('Google Scholar scraper initialized');
       }
 
-      // TODO: Initialize other scrapers (PubMed, arXiv, etc.)
-      // if (this.config.scrapers.pubmed) {
-      //   const pubmed = new PubMedScraper(this.config.scrapers.pubmed, this.logger);
-      //   await pubmed.initialize();
-      //   this.scrapers.set('PubMed', pubmed);
-      // }
+      // Initialize PubMed scraper
+      if (this.config.scrapers.pubmed) {
+        const pubmed = new PubMedScraper(
+          this.config.scrapers.pubmed,
+          this.logger
+        );
+        await pubmed.initialize();
+        this.scrapers.set('PubMed', pubmed);
+        
+        this.initializeScraperStats('PubMed', pubmed);
+        this.logger.info('PubMed scraper initialized');
+      }
+
+      // Initialize arXiv scraper
+      if (this.config.scrapers.arxiv) {
+        const arxiv = new ArXivScraper(
+          this.config.scrapers.arxiv,
+          this.logger
+        );
+        await arxiv.initialize();
+        this.scrapers.set('arXiv', arxiv);
+        
+        this.initializeScraperStats('arXiv', arxiv);
+        this.logger.info('arXiv scraper initialized');
+      }
 
       this.initialized = true;
       this.logger.info('ScraperManager initialization completed', {
@@ -369,6 +392,19 @@ export class ScraperManager {
           includeCitations: options.filters?.includeCitations
         } as GoogleScholarOptions;
       
+      case 'PubMed':
+        return {
+          ...baseOptions,
+          sortBy: options.filters?.yearFrom ? 'date' : 'relevance'
+        };
+      
+      case 'arXiv':
+        return {
+          ...baseOptions,
+          sortBy: options.filters?.yearFrom ? 'date' : 'relevance',
+          sortOrder: 'descending'
+        };
+      
       // Add cases for other scrapers as they're implemented
       default:
         return baseOptions;
@@ -523,12 +559,12 @@ export class ScraperManager {
     this.globalRequestCount++;
   }
 
-     /**
-    * Generate unique session ID
-    */
-   private generateSessionId(): string {
-     return `search_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-   }
+  /**
+   * Generate unique session ID
+   */
+  private generateSessionId(): string {
+    return `search_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+  }
 }
 
 // Factory function for creating scraper manager
@@ -539,6 +575,16 @@ export const createScraperManager = (logger: winston.Logger): ScraperManager => 
         ...createDefaultScrapingConfig(),
         delayBetweenRequests: 3000, // 3 seconds for Google Scholar
         maxConcurrentPages: 2
+      },
+      pubmed: {
+        ...createDefaultScrapingConfig(),
+        delayBetweenRequests: 2000, // 2 seconds for PubMed
+        maxConcurrentPages: 3
+      },
+      arxiv: {
+        ...createDefaultScrapingConfig(),
+        delayBetweenRequests: 1500, // 1.5 seconds for arXiv
+        maxConcurrentPages: 3
       }
     },
     globalRateLimit: 20, // 20 requests per minute globally

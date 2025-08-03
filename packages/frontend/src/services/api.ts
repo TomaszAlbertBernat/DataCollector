@@ -14,7 +14,7 @@ import type {
 
 // Create axios instance with default configuration
 const api: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3005',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -88,6 +88,12 @@ export const documentsApi = {
   // Get document by ID
   getDocument: async (documentId: string): Promise<DocumentResponse> => {
     const response = await api.get<ApiResponse<DocumentResponse>>(`/api/documents/${documentId}`)
+    return response.data.data!
+  },
+
+  // Get document content for preview
+  getDocumentContent: async (documentId: string): Promise<{ content: string; highlights?: any[]; metadata?: any }> => {
+    const response = await api.get<ApiResponse<{ content: string; highlights?: any[]; metadata?: any }>>(`/api/documents/${documentId}/content`)
     return response.data.data!
   },
 

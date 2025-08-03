@@ -13,31 +13,32 @@ import rateLimit from 'express-rate-limit';
 // Import services
 import { createOpenAIService } from './services/ai/OpenAIService';
 import { createLangChainService } from './services/ai/LangChainService';
+import { EmbeddingGenerator } from './services/ai/EmbeddingGenerator';
 import { createDataCollectionAgent } from './services/agents/DataCollectionAgent';
 import { createScraperManager } from './services/scrapers/ScraperManager';
 import { JobQueue } from './services/queue/JobQueue';
 import { JobStateManager } from './services/queue/JobStateManager';
 import { JobProcessor } from './services/queue/JobProcessor';
+import { createOpenSearchService } from './services/search/OpenSearchService';
+import { createChromaDBService } from './services/search/ChromaDBService';
+import { createHybridSearchEngine } from './services/search/HybridSearchEngine';
 import { CollectionJob } from './services/jobs/CollectionJob';
 import { createJobRouter } from './routes/jobs';
 import { createSearchRouter } from './routes/search';
 import { createUploadRouter } from './routes/upload';
+import { createDocumentRouter } from './routes/documents';
 import { JobType } from './types/job';
+import { MetricsService } from './services/MetricsService';
 
 // Import types
 import { HealthCheckResponse, ServiceHealthStatus } from './types/api';
 
-// Load environment variables from root directory
-import path from 'path';
-const envPath = 'C:\\Users\\tomasz\\Documents\\Programowanie lapek\\DataCollector\\.env';
-console.log('Loading .env from:', envPath);
-console.log('.env file exists:', require('fs').existsSync(envPath));
-dotenv.config({ path: envPath });
-console.log('OPENAI_API_KEY loaded:', !!process.env.OPENAI_API_KEY, 'Length:', process.env.OPENAI_API_KEY?.length || 0);
+// Load environment configuration using our safe environment module
+import { ENV_CONFIG, ENV_STATUS, getEnvironmentInfo } from './config/environment';
 
-// Initialize logger
+// Initialize logger using environment configuration
 const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
+  level: ENV_CONFIG.LOG_LEVEL,
   format: winston.format.combine(
     winston.format.timestamp(),
     winston.format.errors({ stack: true }),
@@ -60,17 +61,19 @@ let pgPool: Pool;
 let redisClient: any;
 let openaiService: any = null;
 let langchainService: any = null;
+let embeddingGenerator: EmbeddingGenerator | null = null;
 let dataCollectionAgent: any = null;
 let scraperManager: any = null;
 let jobQueue: JobQueue | null = null;
 let jobStateManager: JobStateManager | null = null;
 let jobProcessor: JobProcessor | null = null;
 let searchEngine: any = null;
+let metricsService: MetricsService | null = null;
 
 // Initialize PostgreSQL connection pool
 const initializePostgreSQL = async (): Promise<Pool> => {
   const pool = new Pool({
-    connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres123@localhost:5432/datacollector',
+    connectionString: ENV_CONFIG.DATABASE_URL,
     max: 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 2000,
@@ -89,7 +92,7 @@ const initializePostgreSQL = async (): Promise<Pool> => {
 // Initialize Redis connection
 const initializeRedis = async () => {
   const client = createClient({
-    url: process.env.REDIS_URL || 'redis://:redis123@localhost:6379'
+    url: ENV_CONFIG.REDIS_URL
   });
 
   client.on('error', (err) => {
@@ -138,6 +141,15 @@ const initializeAIServices = async () => {
     langchainService = createLangChainService(openaiService, logger);
     logger.info('LangChain service initialized successfully');
 
+    // Initialize EmbeddingGenerator
+    embeddingGenerator = new EmbeddingGenerator(openaiApiKey, {
+      model: 'text-embedding-3-small',
+      batchSize: 100,
+      enableCaching: true,
+      cacheExpiry: 3600 // 1 hour
+    });
+    logger.info('EmbeddingGenerator initialized successfully');
+
     // Initialize DataCollectionAgent
     dataCollectionAgent = createDataCollectionAgent(openaiService, langchainService, logger);
     logger.info('DataCollectionAgent initialized successfully');
@@ -147,6 +159,7 @@ const initializeAIServices = async () => {
     // Don't throw error, just log it and continue without AI services
     openaiService = null;
     langchainService = null;
+    embeddingGenerator = null;
     dataCollectionAgent = null;
   }
 };
@@ -197,11 +210,7 @@ const initializeJobServices = async () => {
       }
     };
 
-    jobQueue = new JobQueue(jobQueueConfig, redisClient, logger);
-    await jobQueue.initialize();
-    logger.info('JobQueue initialized successfully');
-
-    // Initialize job state manager
+    // Initialize job state manager first
     const stateManagerConfig = {
       enableWebSocket: true,
       progressUpdateInterval: 5000,
@@ -210,6 +219,11 @@ const initializeJobServices = async () => {
 
     jobStateManager = new JobStateManager(pgPool, logger, stateManagerConfig, io);
     logger.info('JobStateManager initialized successfully');
+
+    // Initialize job queue with state manager
+    jobQueue = new JobQueue(jobQueueConfig, redisClient, logger, jobStateManager);
+    await jobQueue.initialize();
+    logger.info('JobQueue initialized successfully');
 
     // Initialize job processor
     const processorConfig = {
@@ -225,30 +239,82 @@ const initializeJobServices = async () => {
 
     jobProcessor = new JobProcessor(jobQueue, jobStateManager, processorConfig, logger);
     
-    // Register job classes
+    // Register job classes BEFORE initializing the processor
     jobProcessor.registerJobClass(JobType.COLLECTION, CollectionJob);
     
+    // Register required services for job processing
+    jobProcessor.registerService('openaiService', openaiService);
+    jobProcessor.registerService('langchainService', langchainService);
+    jobProcessor.registerService('dataCollectionAgent', dataCollectionAgent);
+    jobProcessor.registerService('scraperManager', scraperManager);
+    
+    // Initialize the processor AFTER registering everything
     await jobProcessor.initialize();
     logger.info('JobProcessor initialized successfully');
+    
+    // Verify job processor is working
+    const health = await jobProcessor.getHealthInfo();
+    logger.info('Job processor health check', {
+      initialized: health.initialized,
+      registeredJobTypes: health.registeredJobTypes,
+      queueStats: health.queueStats
+    });
 
   } catch (error) {
     logger.error('Failed to initialize job services:', error);
     throw error;
   }
-};
+  };
 
 // Initialize search services
 const initializeSearchServices = async () => {
   try {
-    // For now, we'll create a placeholder search engine
-    // In a real implementation, you'd initialize OpenSearch and ChromaDB
-    logger.info('Search services placeholder - will be implemented with OpenSearch and ChromaDB');
+    // Check if embedding generator is available
+    if (!embeddingGenerator) {
+      logger.warn('EmbeddingGenerator not available - search services will be limited');
+      searchEngine = null;
+      return;
+    }
     
-    // TODO: Initialize actual search services
-    // const openSearchService = createOpenSearchService(openSearchConfig, logger);
-    // const chromaDBService = createChromaDBService(chromaDBConfig, logger);
-    // searchEngine = createHybridSearchEngine(openSearchService, chromaDBService, searchConfig, logger);
-    // await searchEngine.initialize();
+    // Initialize OpenSearch service
+    const openSearchService = createOpenSearchService({
+      node: ENV_CONFIG.OPENSEARCH_URL,
+      auth: {
+        username: 'admin', // Default for local development
+        password: 'admin'  // Default for local development
+      },
+      ssl: {
+        rejectUnauthorized: false // For local development
+      },
+      timeout: 30000
+    }, logger);
+    
+    // Initialize ChromaDB service
+    const chromaDBService = createChromaDBService({
+      url: ENV_CONFIG.CHROMADB_URL,
+      collectionName: 'datacollector',
+      embeddingDimension: 1536, // OpenAI text-embedding-3-small dimension
+      distanceFunction: 'cosine'
+    }, embeddingGenerator, logger);
+    
+    // Initialize hybrid search engine
+    searchEngine = createHybridSearchEngine(
+      openSearchService,
+      chromaDBService,
+      {
+        defaultWeights: {
+          fulltext: 0.6,
+          semantic: 0.4,
+        },
+        maxResults: 100,
+        enableCaching: true,
+        cacheTimeout: 5 * 60 * 1000, // 5 minutes
+      },
+      logger
+    );
+    
+    await searchEngine.initialize();
+    logger.info('Search services initialized successfully');
     
   } catch (error) {
     logger.error('Failed to initialize search services:', error);
@@ -310,6 +376,28 @@ app.use((req, res, next) => {
   next();
 });
 
+// Metrics tracking middleware
+app.use((req, res, next) => {
+  if (metricsService) {
+    const requestId = `${req.method}-${req.path}-${Date.now()}-${Math.random()}`;
+    metricsService.startRequest(requestId);
+    
+    // Track response time
+    res.on('finish', () => {
+      if (metricsService) {
+        const duration = metricsService.endRequest(requestId);
+        logger.debug(`Request completed: ${req.method} ${req.path} - ${duration}ms`, {
+          method: req.method,
+          path: req.path,
+          statusCode: res.statusCode,
+          duration
+        });
+      }
+    });
+  }
+  next();
+});
+
 // Make logger available to routes
 app.locals.logger = logger;
 
@@ -324,34 +412,56 @@ app.get('/health', async (req, res) => {
     try {
       const pgStart = Date.now();
       await pgPool.query('SELECT 1');
+      const pgResponseTime = Date.now() - pgStart;
       serviceStatuses.push({
         name: 'postgresql',
         status: 'healthy',
-        responseTime: Date.now() - pgStart
+        responseTime: pgResponseTime
       });
+      
+      // Record metrics
+      if (metricsService) {
+        metricsService.recordServiceHealth('postgresql', 'healthy', pgResponseTime);
+      }
     } catch (error) {
       serviceStatuses.push({
         name: 'postgresql',
         status: 'unhealthy',
         error: (error as Error).message
       });
+      
+      // Record metrics
+      if (metricsService) {
+        metricsService.recordServiceHealth('postgresql', 'unhealthy', 0);
+      }
     }
 
     // Check Redis
     try {
       const redisStart = Date.now();
       await redisClient.ping();
+      const redisResponseTime = Date.now() - redisStart;
       serviceStatuses.push({
         name: 'redis',
         status: 'healthy',
-        responseTime: Date.now() - redisStart
+        responseTime: redisResponseTime
       });
+      
+      // Record metrics
+      if (metricsService) {
+        metricsService.recordServiceHealth('redis', 'healthy', redisResponseTime);
+      }
     } catch (error) {
       serviceStatuses.push({
         name: 'redis',
         status: 'unhealthy',
         error: (error as Error).message
       });
+      
+      // Record metrics
+      if (metricsService) {
+        metricsService.recordServiceHealth('redis', 'unhealthy', 0);
+      }
     }
 
     // Check OpenAI
@@ -444,6 +554,121 @@ app.get('/ready', (req, res) => {
   });
 });
 
+// Metrics endpoints
+app.get('/metrics', (req, res) => {
+  if (!metricsService) {
+    return res.status(503).json({
+      error: 'Metrics service not available',
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  try {
+    const metrics = metricsService.getMetrics();
+    return res.status(200).json({
+      success: true,
+      data: metrics,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to get metrics:', error);
+    return res.status(500).json({
+      error: 'Failed to retrieve metrics',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+app.get('/metrics/services', (req, res) => {
+  if (!metricsService) {
+    return res.status(503).json({
+      error: 'Metrics service not available',
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  try {
+    const serviceMetrics = metricsService.getServiceMetrics();
+    res.status(200).json({
+      success: true,
+      data: serviceMetrics,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Failed to get service metrics:', error);
+    res.status(500).json({
+      error: 'Failed to retrieve service metrics',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Prometheus-compatible metrics endpoint
+app.get('/metrics/prometheus', (req, res) => {
+  if (!metricsService) {
+    return res.status(503).send('# Metrics service not available\n');
+  }
+
+  try {
+    const metrics = metricsService.getMetrics();
+    const serviceMetrics = metricsService.getServiceMetrics();
+    
+    let prometheusMetrics = '';
+    
+    // System metrics
+    prometheusMetrics += `# HELP datacollector_uptime_seconds Application uptime in seconds\n`;
+    prometheusMetrics += `# TYPE datacollector_uptime_seconds gauge\n`;
+    prometheusMetrics += `datacollector_uptime_seconds ${metrics.uptime / 1000}\n\n`;
+    
+    prometheusMetrics += `# HELP datacollector_memory_bytes Memory usage in bytes\n`;
+    prometheusMetrics += `# TYPE datacollector_memory_bytes gauge\n`;
+    prometheusMetrics += `datacollector_memory_used_bytes ${metrics.memory.used}\n`;
+    prometheusMetrics += `datacollector_memory_heap_used_bytes ${metrics.memory.heapUsed}\n`;
+    prometheusMetrics += `datacollector_memory_heap_total_bytes ${metrics.memory.heapTotal}\n\n`;
+    
+    prometheusMetrics += `# HELP datacollector_requests_total Total number of requests\n`;
+    prometheusMetrics += `# TYPE datacollector_requests_total counter\n`;
+    prometheusMetrics += `datacollector_requests_total ${metrics.requests.total}\n\n`;
+    
+    prometheusMetrics += `# HELP datacollector_requests_active Current active requests\n`;
+    prometheusMetrics += `# TYPE datacollector_requests_active gauge\n`;
+    prometheusMetrics += `datacollector_requests_active ${metrics.requests.active}\n\n`;
+    
+    prometheusMetrics += `# HELP datacollector_jobs_total Total number of jobs\n`;
+    prometheusMetrics += `# TYPE datacollector_jobs_total counter\n`;
+    prometheusMetrics += `datacollector_jobs_total{status="pending"} ${metrics.jobs.pending}\n`;
+    prometheusMetrics += `datacollector_jobs_total{status="running"} ${metrics.jobs.running}\n`;
+    prometheusMetrics += `datacollector_jobs_total{status="completed"} ${metrics.jobs.completed}\n`;
+    prometheusMetrics += `datacollector_jobs_total{status="failed"} ${metrics.jobs.failed}\n\n`;
+    
+    prometheusMetrics += `# HELP datacollector_search_queries_total Total search queries\n`;
+    prometheusMetrics += `# TYPE datacollector_search_queries_total counter\n`;
+    prometheusMetrics += `datacollector_search_queries_total ${metrics.search.totalQueries}\n\n`;
+    
+    prometheusMetrics += `# HELP datacollector_search_response_time_seconds Average search response time\n`;
+    prometheusMetrics += `# TYPE datacollector_search_response_time_seconds gauge\n`;
+    prometheusMetrics += `datacollector_search_response_time_seconds ${metrics.search.averageResponseTime / 1000}\n\n`;
+    
+    // Service health metrics
+    serviceMetrics.forEach(service => {
+      prometheusMetrics += `# HELP datacollector_service_health Service health status\n`;
+      prometheusMetrics += `# TYPE datacollector_service_health gauge\n`;
+      const healthValue = service.status === 'healthy' ? 1 : service.status === 'degraded' ? 0.5 : 0;
+      prometheusMetrics += `datacollector_service_health{service="${service.name}"} ${healthValue}\n`;
+      
+      prometheusMetrics += `# HELP datacollector_service_response_time_seconds Service response time\n`;
+      prometheusMetrics += `# TYPE datacollector_service_response_time_seconds gauge\n`;
+      prometheusMetrics += `datacollector_service_response_time_seconds{service="${service.name}"} ${service.responseTime / 1000}\n`;
+    });
+    
+    res.set('Content-Type', 'text/plain');
+    res.status(200).send(prometheusMetrics);
+  } catch (error) {
+    logger.error('Failed to generate Prometheus metrics:', error);
+    res.status(500).send('# Failed to generate metrics\n');
+  }
+});
+
 // API routes
 app.use('/api/jobs', (req, res, next) => {
   if (!jobQueue || !jobStateManager || !jobProcessor) {
@@ -507,12 +732,9 @@ app.use('/api/upload', (req, res, next) => {
   return uploadRouter(req, res, next);
 });
 
-app.use('/api/documents', (req, res) => {
-  res.status(501).json({ 
-    error: 'Document routes not implemented yet',
-    message: 'Document endpoints will be implemented in Phase 7'
-  });
-});
+// Document routes
+const documentRouter = createDocumentRouter({ logger });
+app.use('/api/documents', documentRouter);
 
 // WebSocket connection handling
 io.on('connection', (socket) => {
@@ -626,15 +848,43 @@ const startServer = async () => {
     await initializeScrapingServices();
     await initializeJobServices();
     await initializeSearchServices();
-
-    const PORT = process.env.PORT || 3001;
     
-    server.listen(PORT, () => {
-      logger.info(`DataCollector backend server running on port ${PORT}`, {
-        environment: process.env.NODE_ENV || 'development',
-        version: process.env.npm_package_version || '1.0.0'
+    // Initialize metrics service
+    metricsService = new MetricsService(logger);
+    logger.info('MetricsService initialized successfully');
+
+    // Determine initial port (default 3001) and convert to number
+    let currentPort: number = Number(process.env.PORT) || 3001;
+    const maxRetries = 10;
+
+    /**
+     * Try to start the HTTP server. If the port is already in use, increment
+     * the port number (up to `maxRetries` times) and retry. This prevents the
+     * common "EADDRINUSE" crash that occurs when multiple test or dev
+     * instances are running simultaneously.
+     */
+    const listen = (retries = 0) => {
+      server.once('error', (err: NodeJS.ErrnoException) => {
+        if (err.code === 'EADDRINUSE' && retries < maxRetries) {
+          logger.warn(`Port ${currentPort} in use, retrying with port ${currentPort + 1}`);
+          currentPort += 1;
+          listen(retries + 1);
+        } else {
+          logger.error('Failed to start server:', err);
+          process.exit(1);
+        }
       });
-    });
+
+      server.listen(currentPort, () => {
+        logger.info(`DataCollector backend server running on port ${currentPort}`, {
+          environment: process.env.NODE_ENV || 'development',
+          version: process.env.npm_package_version || '1.0.0'
+        });
+      });
+    };
+
+    // Start listening (initial attempt)
+    listen();
 
   } catch (error) {
     logger.error('Failed to start server:', error);

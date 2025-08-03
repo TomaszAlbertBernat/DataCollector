@@ -25,6 +25,8 @@
     "reset:infrastructure": "npm run stop:infrastructure && docker-compose -f infrastructure/docker/docker-compose.yml down -v && npm run setup:infrastructure",
     "logs": "docker-compose -f infrastructure/docker/docker-compose.yml logs -f",
     "test:infrastructure": "node scripts/test-infrastructure.js",
+    "check:env": "node scripts/check-environment.js",
+    "check:environment": "node scripts/check-environment.js",
     "typecheck": "npm run typecheck --workspaces"
   },
   "devDependencies": {

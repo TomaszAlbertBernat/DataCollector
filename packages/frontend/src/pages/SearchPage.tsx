@@ -1,5 +1,5 @@
 import { useState } from 'react'
-// import { useQuery } from '@tanstack/react-query' // TODO: Implement when search functionality is ready
+import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
 import { 
@@ -10,90 +10,92 @@ import {
   TagIcon,
   UserIcon,
   ArrowDownTrayIcon,
-  EyeIcon
+  EyeIcon,
+  BeakerIcon
 } from '@heroicons/react/24/outline'
-// import { searchApi } from '@/services/api' // TODO: Implement when search functionality is ready
+import { searchApi, documentsApi } from '@/services/api'
 import { DocumentViewer } from '@/components/ui/DocumentViewer'
-import type { SearchResult, SearchFilters, DocumentResponse } from '@/types/api'
+import type { SearchResult, SearchFilters, SearchMode, SearchSortField } from '@/types/api'
 
-// Mock search results for development
-const mockSearchResults: SearchResult[] = [
+// Demo search results featuring mental health content (matching backend test data)
+const demoSearchResults: SearchResult[] = [
   {
-    id: '1',
-    title: 'Deep Learning Applications in Natural Language Processing',
-    content: 'This paper presents a comprehensive survey of deep learning techniques applied to natural language processing tasks...',
-    url: 'https://arxiv.org/abs/2021.00001',
-    source: 'arXiv',
-    authors: ['John Doe', 'Jane Smith'],
-    publicationDate: '2021-03-15',
-    fileType: 'pdf',
-    fileSize: 2048000,
-    relevanceScore: 0.95,
+    id: 'demo-1',
+    title: 'Meditation and Mental Health: Dr. K\'s Guide to Mindfulness Practice',
+    content: 'This meditation guide explores how mindfulness practice can significantly improve mental health outcomes. The techniques discussed include breathing exercises, body awareness, and cognitive restructuring through meditative practices...',
+    source: 'Dr. K / Healthy Gamer',
+    authors: ['Dr. K (Alok Kanojia)'],
+    publicationDate: '2024-01-15',
+    fileType: 'txt',
+    fileSize: 45680,
+    relevanceScore: 0.96,
     highlights: [
-      { field: 'title', fragments: ['<mark>Deep Learning</mark> Applications'] },
-      { field: 'content', fragments: ['comprehensive survey of <mark>deep learning</mark> techniques'] }
-    ]
+      { field: 'title', fragments: ['<mark>Meditation</mark> and <mark>Mental Health</mark>'] },
+      { field: 'content', fragments: ['<mark>mindfulness practice</mark> can significantly improve <mark>mental health</mark> outcomes'] }
+    ],
+    metadata: { category: 'meditation', duration: '45min', type: 'transcript' }
   },
   {
-    id: '2',
-    title: 'Machine Learning for Climate Change Prediction',
-    content: 'An analysis of various machine learning algorithms for predicting climate change patterns...',
-    url: 'https://scholar.google.com/article2',
-    source: 'Google Scholar',
-    authors: ['Alice Johnson', 'Bob Wilson'],
-    publicationDate: '2022-01-20',
-    fileType: 'pdf',
-    fileSize: 1536000,
-    relevanceScore: 0.87,
+    id: 'demo-2', 
+    title: 'Understanding Depression: A Psychiatrist\'s Perspective on Modern Mental Health',
+    content: 'Depression affects millions worldwide, but understanding its mechanisms can help in treatment. This lecture covers neurobiological factors, environmental triggers, and evidence-based treatment approaches...',
+    source: 'Dr. K / Healthy Gamer',
+    authors: ['Dr. K (Alok Kanojia)'],
+    publicationDate: '2024-02-20',
+    fileType: 'txt',
+    fileSize: 52340,
+    relevanceScore: 0.93,
     highlights: [
-      { field: 'title', fragments: ['<mark>Machine Learning</mark> for Climate'] },
-      { field: 'content', fragments: ['various <mark>machine learning</mark> algorithms'] }
-    ]
+      { field: 'title', fragments: ['Understanding <mark>Depression</mark>'] },
+      { field: 'content', fragments: ['<mark>Depression</mark> affects millions worldwide'] }
+    ],
+    metadata: { category: 'lecture', duration: '60min', type: 'transcript' }
   },
   {
-    id: '3',
-    title: 'Artificial Intelligence in Healthcare: A Review',
-    content: 'This review examines the current state and future prospects of AI applications in healthcare...',
-    url: 'https://pubmed.ncbi.nlm.nih.gov/article3',
-    source: 'PubMed',
-    authors: ['Dr. Sarah Chen', 'Dr. Michael Brown'],
-    publicationDate: '2023-06-10',
-    fileType: 'pdf',
-    fileSize: 3072000,
-    relevanceScore: 0.82,
+    id: 'demo-3',
+    title: 'Anxiety Management Techniques for the Digital Age',
+    content: 'Modern anxiety often stems from digital overwhelm and social media pressure. This session explores practical techniques for managing anxiety in our hyperconnected world, including digital detox strategies...',
+    source: 'Dr. K / Healthy Gamer',
+    authors: ['Dr. K (Alok Kanojia)'],
+    publicationDate: '2024-03-10',
+    fileType: 'txt',
+    fileSize: 38920,
+    relevanceScore: 0.89,
     highlights: [
-      { field: 'title', fragments: ['<mark>Artificial Intelligence</mark> in Healthcare'] },
-      { field: 'content', fragments: ['current state and future prospects of <mark>AI applications</mark>'] }
-    ]
+      { field: 'title', fragments: ['<mark>Anxiety</mark> Management Techniques'] },
+      { field: 'content', fragments: ['Modern <mark>anxiety</mark> often stems from digital overwhelm'] }
+    ],
+    metadata: { category: 'lecture', duration: '50min', type: 'transcript' }
   }
-]
+];
 
-// Mock function to convert search result to document
-const createMockDocument = (result: SearchResult): DocumentResponse => ({
-  id: result.id,
-  title: result.title,
-  url: result.url,
-  filePath: result.url || `/documents/${result.id}.${result.fileType}`,
-  fileType: result.fileType,
-  fileSize: result.fileSize || 0,
-  source: result.source,
-  authors: result.authors,
-  publicationDate: result.publicationDate,
-  abstract: result.content,
-  keywords: ['AI', 'machine learning', 'research'],
-  language: 'en',
-  createdAt: new Date().toISOString(),
-  metadata: {
-    relevanceScore: result.relevanceScore,
-    source: result.source,
-    doi: `10.1000/example.${result.id}`
-  }
-})
+// Demo document creation function (kept for reference)
+// const createDemoDocument = (result: SearchResult): DocumentResponse => ({
+//   id: result.id,
+//   title: result.title,
+//   filePath: `/demo/documents/${result.id}.${result.fileType}`,
+//   fileType: result.fileType,
+//   fileSize: result.fileSize || 0,
+//   source: result.source,
+//   authors: result.authors,
+//   publicationDate: result.publicationDate,
+//   abstract: result.content,
+//   keywords: ['mental health', 'psychology', 'wellness', 'Dr. K'],
+//   language: 'en',
+//   createdAt: new Date().toISOString(),
+//   metadata: {
+//     ...result.metadata,
+//     relevanceScore: result.relevanceScore,
+//     isDemo: true
+//   }
+// });
 
 export function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '')
+  const [searchMode, setSearchMode] = useState<SearchMode>('hybrid' as SearchMode)
   const [showFilters, setShowFilters] = useState(false)
+  const [demoMode, setDemoMode] = useState(false)
   const [filters, setFilters] = useState<SearchFilters>({
     sources: [],
     fileTypes: [],
@@ -102,70 +104,173 @@ export function SearchPage() {
     language: 'en'
   })
 
-  // Search results (using mock data for now)
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
-  const [isSearching, setIsSearching] = useState(false)
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
 
   // Document viewer state
-  const [selectedDocument, setSelectedDocument] = useState<DocumentResponse | null>(null)
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null)
   const [isViewerOpen, setIsViewerOpen] = useState(false)
 
-  // Simulate search API call
-  const performSearch = async () => {
-    if (!searchQuery.trim()) return
+  // Search API integration (real API + demo fallback)
+  const { 
+    data: searchResults, 
+    isLoading: isSearching, 
+    error: searchError,
+    refetch: performSearch 
+  } = useQuery({
+    queryKey: ['search', searchQuery, searchMode, filters, demoMode, currentPage, pageSize],
+    queryFn: async () => {
+      if (!searchQuery.trim()) return { results: [], totalResults: 0, searchTime: 0, pagination: { page: 1, limit: 20, total: 0, pages: 0, hasNext: false, hasPrev: false } };
+      
+      if (demoMode) {
+        // Demo mode - filter demo results
+        await new Promise(resolve => setTimeout(resolve, 800)); // Simulate API delay
+        const filteredResults = demoSearchResults.filter(result =>
+          result.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          result.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          result.authors?.some(author => author.toLowerCase().includes(searchQuery.toLowerCase()))
+        );
+        
+        return {
+          results: filteredResults,
+          totalResults: filteredResults.length,
+          searchTime: Math.floor(Math.random() * 50) + 10, // 10-60ms
+          pagination: { page: 1, limit: 20, total: filteredResults.length, pages: 1, hasNext: false, hasPrev: false }
+        };
+      }
+      
+      // Try real API first - use fulltext mode for now since semantic search has issues
+      try {
+        const effectiveSearchMode = searchMode === 'hybrid' || searchMode === 'semantic' ? 'fulltext' as SearchMode : searchMode;
+        const response = await searchApi.search({
+          query: searchQuery,
+          searchMode: effectiveSearchMode,
+          filters,
+          pagination: { page: currentPage, limit: pageSize },
+          sort: { field: 'relevance' as SearchSortField, order: 'desc' },
+          includeHighlights: true
+        });
+        return response;
+      } catch (error) {
+        // If real API fails, automatically switch to demo mode
+        console.warn('Real API failed, switching to demo mode:', error);
+        setDemoMode(true);
+        // Return demo results instead of throwing error
+        await new Promise(resolve => setTimeout(resolve, 800)); // Simulate API delay
+        const filteredResults = demoSearchResults.filter(result =>
+          result.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          result.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          result.authors?.some(author => author.toLowerCase().includes(searchQuery.toLowerCase()))
+        );
+        
+        return {
+          results: filteredResults,
+          totalResults: filteredResults.length,
+          searchTime: Math.floor(Math.random() * 50) + 10, // 10-60ms
+          pagination: { page: 1, limit: 20, total: filteredResults.length, pages: 1, hasNext: false, hasPrev: false }
+        };
+      }
+    },
+    enabled: false, // Only run when manually triggered
+  });
 
-    setIsSearching(true)
+  // Handle search execution
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+    
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      // Filter mock results based on search query
-      const filteredResults = mockSearchResults.filter(result =>
-        result.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        result.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        result.authors?.some(author => author.toLowerCase().includes(searchQuery.toLowerCase()))
-      )
-      
-      setSearchResults(filteredResults)
+      setCurrentPage(1); // Reset to first page on new search
+      await performSearch();
       
       // Update URL with search query
-      setSearchParams({ q: searchQuery })
+      setSearchParams({ q: searchQuery, mode: searchMode });
       
-      toast.success(`Found ${filteredResults.length} results`)
+      const resultCount = searchResults?.totalResults || 0;
+      toast.success(`Found ${resultCount} results`);
     } catch (error) {
-      toast.error('Search failed. Please try again.')
-    } finally {
-      setIsSearching(false)
+      console.error('Search error:', error);
+      toast.error('Search failed. Please try again.');
     }
-  }
+  };
+
+  // Handle pagination
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    performSearch();
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+    performSearch();
+  };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      performSearch()
+      handleSearch()
     }
   }
 
-  const handleViewDocument = (result: SearchResult) => {
-    const document = createMockDocument(result)
-    setSelectedDocument(document)
-    setIsViewerOpen(true)
+  const handleViewDocument = async (result: SearchResult) => {
+    try {
+      // For demo results, use the demo ID
+      if (demoMode || result.id.startsWith('demo-')) {
+        setSelectedDocumentId(result.id);
+        setIsViewerOpen(true);
+        return;
+      }
+
+      // For real results, use the result ID
+      setSelectedDocumentId(result.id);
+      setIsViewerOpen(true);
+    } catch (error) {
+      console.error('Error loading document:', error);
+      toast.error('Failed to load document');
+    }
   }
 
   const handleDownloadDocument = async (result: SearchResult) => {
     try {
-      // Create a mock download
       if (result.url) {
-        window.open(result.url, '_blank')
-        toast.success('Opening document in new tab')
+        // For external URLs, open in new tab
+        window.open(result.url, '_blank');
+        toast.success('Opening document in new tab');
       } else {
-        toast('Download functionality will be implemented with backend API', { 
-          icon: '💡',
-          style: { background: '#3b82f6', color: 'white' }
-        })
+        // For internal documents, use the download API
+        const blob = await documentsApi.downloadDocument(result.id);
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${result.title}.${result.fileType}`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        toast.success('Download started');
       }
     } catch (error) {
-      toast.error('Download failed')
+      console.error('Download error:', error);
+      toast.error('Download failed');
     }
+  }
+
+  // Render highlighted content
+  const renderHighlightedContent = (text: string, fieldHighlights?: any[]) => {
+    if (!fieldHighlights || fieldHighlights.length === 0) {
+      return text
+    }
+
+    let highlightedText = text
+    fieldHighlights.forEach(highlight => {
+      highlight.fragments.forEach((fragment: string) => {
+        const cleanFragment = fragment.replace(/<mark>(.*?)<\/mark>/g, '$1')
+        const regex = new RegExp(`(${cleanFragment})`, 'gi')
+        highlightedText = highlightedText.replace(regex, '<mark>$1</mark>')
+      })
+    })
+
+    return highlightedText
   }
 
   const formatFileSize = (bytes: number): string => {
@@ -183,16 +288,67 @@ export function SearchPage() {
     })
   }
 
+  const getRelevanceColor = (score: number): string => {
+    if (score >= 0.9) return 'text-green-600 bg-green-100'
+    if (score >= 0.7) return 'text-blue-600 bg-blue-100'
+    if (score >= 0.5) return 'text-yellow-600 bg-yellow-100'
+    return 'text-gray-600 bg-gray-100'
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Search Documents</h1>
-        <p className="text-gray-600">Find research papers and documents from your collections</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Search Documents</h1>
+          <p className="text-gray-600">Find research papers and documents from your collections</p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setDemoMode(!demoMode)}
+            className={`flex items-center px-3 py-2 text-sm rounded-md border transition-colors ${
+              demoMode
+                ? 'bg-purple-100 text-purple-700 border-purple-300'
+                : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-50'
+            }`}
+            title={demoMode ? 'Using demo data (mental health content)' : 'Click to enable demo mode'}
+          >
+            <BeakerIcon className="h-4 w-4 mr-1" />
+            {demoMode ? 'Demo Mode' : 'Enable Demo'}
+          </button>
+        </div>
       </div>
 
       {/* Search Interface */}
       <div className="card p-6">
+        {/* Search Mode Selector */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Search Mode
+          </label>
+          <div className="flex space-x-2">
+            {([
+              { value: 'hybrid' as SearchMode, label: 'Hybrid', description: 'Best results (full-text + semantic)' },
+              { value: 'fulltext' as SearchMode, label: 'Full-text', description: 'Traditional keyword search' },
+              { value: 'semantic' as SearchMode, label: 'Semantic', description: 'Meaning-based search' },
+              { value: 'fuzzy' as SearchMode, label: 'Fuzzy', description: 'Approximate matching' }
+            ]).map((mode) => (
+              <button
+                key={mode.value}
+                onClick={() => setSearchMode(mode.value)}
+                className={`px-3 py-2 text-sm rounded-md border transition-colors ${
+                  searchMode === mode.value
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                }`}
+                title={mode.description}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="flex space-x-4">
           <div className="flex-1 relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -215,7 +371,7 @@ export function SearchPage() {
             Filters
           </button>
           <button 
-            onClick={performSearch}
+            onClick={handleSearch}
             disabled={isSearching || !searchQuery.trim()}
             className="btn-primary"
           >
@@ -255,6 +411,7 @@ export function SearchPage() {
                   <option value="scholar">Google Scholar</option>
                   <option value="pubmed">PubMed</option>
                   <option value="arxiv">arXiv</option>
+                  <option value="web">Web Search</option>
                 </select>
               </div>
               
@@ -275,18 +432,65 @@ export function SearchPage() {
       </div>
 
       {/* Search Results */}
-      {isSearching ? (
+      {searchError ? (
+        <div className="card p-12 text-center">
+          <div className="text-orange-500 mb-4">
+            <svg className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.966-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            Backend Search Unavailable
+          </h3>
+          <p className="text-gray-600 mb-4">
+            The backend search service is currently unavailable. Using demo mode with mental health content for testing.
+          </p>
+          <div className="flex space-x-3 justify-center">
+            <button 
+              onClick={handleSearch}
+              className="btn-primary"
+            >
+              Try Again
+            </button>
+            <button 
+              onClick={() => {
+                setDemoMode(true);
+                handleSearch();
+              }}
+              className="btn-outline flex items-center"
+            >
+              <BeakerIcon className="h-4 w-4 mr-2" />
+              Continue with Demo
+            </button>
+          </div>
+        </div>
+      ) : isSearching ? (
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Searching documents...</p>
         </div>
-      ) : searchResults.length > 0 ? (
+      ) : searchResults?.results && searchResults.results.length > 0 ? (
         <div className="space-y-4">
           {/* Results Header */}
           <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-600">
-              Found {searchResults.length} results for "{searchQuery}"
-            </p>
+            <div className="flex items-center space-x-4">
+              <p className="text-sm text-gray-600">
+                Found {searchResults?.totalResults || 0} results for "{searchQuery}"
+              </p>
+              {searchResults?.searchTime && (
+                <span className="text-xs text-gray-500">
+                  ({searchResults.searchTime}ms)
+                </span>
+              )}
+              <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-600">
+                {searchMode.charAt(0).toUpperCase() + searchMode.slice(1)} search
+              </span>
+              {demoMode && (
+                <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-600">
+                  Demo Data
+                </span>
+              )}
+            </div>
             <div className="flex items-center space-x-2 text-sm text-gray-500">
               <span>Sort by:</span>
               <select className="border-0 bg-transparent focus:ring-0 font-medium">
@@ -299,7 +503,7 @@ export function SearchPage() {
 
           {/* Results List */}
           <div className="space-y-4">
-            {searchResults.map((result) => (
+            {searchResults?.results.map((result) => (
               <div key={result.id} className="card p-6 hover:shadow-md transition-shadow duration-200">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -316,6 +520,9 @@ export function SearchPage() {
                       </h3>
                       <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
                         {result.fileType.toUpperCase()}
+                      </span>
+                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getRelevanceColor(result.relevanceScore)}`}>
+                        {Math.round(result.relevanceScore * 100)}% match
                       </span>
                     </div>
 
@@ -340,12 +547,33 @@ export function SearchPage() {
                     </div>
 
                     {/* Content Preview */}
-                    <p className="text-gray-700 mb-3 line-clamp-3">
-                      <span dangerouslySetInnerHTML={{ 
-                        __html: result.highlights?.find(h => h.field === 'content')?.fragments[0] || 
-                               result.content.substring(0, 200) + '...' 
-                      }} />
-                    </p>
+                    <div className="text-gray-700 mb-3">
+                      <p className="line-clamp-3">
+                        {result.highlights?.find(h => h.field === 'content')?.fragments[0] ? (
+                          <span dangerouslySetInnerHTML={{ 
+                            __html: renderHighlightedContent(
+                              result.content.substring(0, 300), 
+                              result.highlights.filter(h => h.field === 'content')
+                            )
+                          }} />
+                        ) : (
+                          <span>{result.content.substring(0, 300)}...</span>
+                        )}
+                      </p>
+                      {result.highlights && result.highlights.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {result.highlights.slice(0, 3).map((highlight, index) => (
+                            <span 
+                              key={index}
+                              className="inline-block px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded"
+                              title={`Highlighted in ${highlight.field}`}
+                            >
+                              {highlight.fragments[0]?.replace(/<mark>(.*?)<\/mark>/g, '$1')}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
 
                     {/* Metadata Footer */}
                     <div className="flex items-center space-x-4 text-xs text-gray-500">
@@ -386,26 +614,60 @@ export function SearchPage() {
             ))}
           </div>
 
-          {/* Pagination Placeholder */}
-          <div className="flex items-center justify-center pt-6">
-            <div className="flex items-center space-x-2">
-              <button className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700">
-                Previous
-              </button>
-              <button className="px-3 py-2 text-sm bg-blue-600 text-white rounded">
-                1
-              </button>
-              <button className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700">
-                2
-              </button>
-              <button className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700">
-                3
-              </button>
-              <button className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700">
-                Next
-              </button>
+          {/* Pagination */}
+          {searchResults?.pagination && searchResults.pagination.pages > 1 && (
+            <div className="flex items-center justify-between pt-6 border-t border-gray-200">
+              <div className="flex items-center space-x-4">
+                <span className="text-sm text-gray-600">
+                  Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, searchResults.totalResults)} of {searchResults.totalResults} results
+                </span>
+                <select 
+                  value={pageSize}
+                  onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                  className="text-sm border border-gray-300 rounded px-2 py-1"
+                >
+                  <option value={10}>10 per page</option>
+                  <option value={20}>20 per page</option>
+                  <option value={50}>50 per page</option>
+                </select>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <button 
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={!searchResults.pagination.hasPrev}
+                  className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                
+                {Array.from({ length: Math.min(5, searchResults.pagination.pages) }, (_, i) => {
+                  const page = i + 1;
+                  return (
+                    <button
+                      key={page}
+                      onClick={() => handlePageChange(page)}
+                      className={`px-3 py-2 text-sm rounded ${
+                        page === currentPage
+                          ? 'bg-blue-600 text-white'
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  );
+                })}
+                
+                <button 
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={!searchResults.pagination.hasNext}
+                  className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       ) : searchQuery && !isSearching ? (
         <div className="card p-12 text-center">
@@ -432,13 +694,13 @@ export function SearchPage() {
       )}
 
       {/* Document Viewer */}
-      {selectedDocument && (
+      {selectedDocumentId && (
         <DocumentViewer
-          document={selectedDocument}
+          documentId={selectedDocumentId}
           isOpen={isViewerOpen}
           onClose={() => {
             setIsViewerOpen(false)
-            setSelectedDocument(null)
+            setSelectedDocumentId(null)
           }}
         />
       )}

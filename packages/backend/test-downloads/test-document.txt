@@ -1,0 +1,10 @@
+This is a test document about machine learning.
+    
+    Machine learning is a subset of artificial intelligence that focuses on algorithms
+    that can learn and make predictions from data. It has applications in healthcare,
+    finance, and many other fields.
+    
+    The main types of machine learning are:
+    1. Supervised Learning
+    2. Unsupervised Learning
+    3. Reinforcement Learning

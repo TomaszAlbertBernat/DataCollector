@@ -47,11 +47,13 @@ DataCollector/
 ├── packages/
 │   ├── backend/                 # 🔧 BACKEND AGENT FOCUS
 │   │   ├── src/
+│   │   │   ├── config/         # Configuration modules (environment, etc.)
 │   │   │   ├── types/          # Shared type definitions
 │   │   │   ├── models/         # Database entities
 │   │   │   ├── services/       # Core services
 │   │   │   ├── routes/         # API endpoints
-│   │   │   └── agents/         # AI collection agents
+│   │   │   ├── agents/         # AI collection agents
+│   │   │   └── tests/          # 🧪 Backend test files
 │   │   └── package.json
 │   └── frontend/               # 🎨 FRONTEND AGENT FOCUS
 │       ├── src/
@@ -59,11 +61,15 @@ DataCollector/
 │       │   ├── pages/          # Page components
 │       │   ├── hooks/          # Custom React hooks
 │       │   ├── services/       # API clients
-│       │   └── types/          # Frontend-specific types
+│       │   ├── types/          # Frontend-specific types
+│       │   └── tests/          # 🧪 Frontend test files
 │       └── package.json
 ├── infrastructure/             # 🐳 SHARED INFRASTRUCTURE
 │   └── docker/                 # Docker services
 ├── docs/                       # 📚 DOCUMENTATION
+├── scripts/                    # 🛠️ UTILITY SCRIPTS
+│   ├── check-environment.js    # Environment validation (SAFE FOR AGENTS)
+│   └── test-infrastructure.js  # Infrastructure testing
 ├── Transcriptions_All/         # 🧠 TEST DATA (Mental Health Content)
 │   └── DRK/                    # Dr. K / Healthy Gamer transcriptions
 │       ├── Meditation ｜ Healthy Gamer/  # 13 meditation transcripts
@@ -149,7 +155,8 @@ packages/backend/src/
 │   └── ai/          # AI service wrappers
 ├── agents/          # Data collection agents
 ├── models/          # Database entities
-└── types/           # Shared type definitions
+├── types/           # Shared type definitions
+└── tests/           # 🧪 Test files (organized)
 ```
 
 ### 🛠️ Tech Stack & Dependencies
@@ -173,7 +180,10 @@ packages/backend/src/
 cd packages/backend
 npm run dev                 # Start development server
 npm run build              # Build TypeScript
-npm run test               # Run tests
+npm run test               # Run all tests
+npm run test:pipeline      # Run pipeline tests
+npm run test:watch         # Run tests in watch mode
+npm run test:coverage      # Run tests with coverage
 npm run lint:fix           # Fix linting issues
 npm run typecheck          # Type checking
 ```
@@ -208,7 +218,8 @@ packages/frontend/src/
 ├── services/        # API client services
 ├── stores/          # State management (Zustand)
 ├── types/           # Frontend-specific types
-└── utils/           # Utility functions
+├── utils/           # Utility functions
+└── tests/           # 🧪 Test files (organized)
 ```
 
 ### 🛠️ Tech Stack & Dependencies
@@ -233,7 +244,9 @@ packages/frontend/src/
 cd packages/frontend
 npm run dev                 # Start Vite dev server
 npm run build              # Build for production
-npm run test               # Run Vitest tests
+npm run test               # Run all tests
+npm run test:ui            # Run tests with UI
+npm run test:coverage      # Run tests with coverage
 npm run lint:fix           # Fix linting issues
 npm run typecheck          # Type checking
 npm run storybook          # Start Storybook
@@ -312,10 +325,35 @@ npm run test:infrastructure          # Test services
 
 ### 🧪 Testing Strategy
 
+### 📁 Test Organization
+All test files have been organized into dedicated `tests/` directories for better maintainability:
+
+#### Backend Tests (`packages/backend/src/tests/`)
+- **Pipeline Tests**: `test-pipeline-simple.ts`, `test-complete-pipeline.ts`, `test-phase3.ts`
+- **Job Processing Tests**: `test-job-processor.ts`, `test-active-job-processing.ts`, `test-job-processing.ts`
+- **Queue Tests**: `test-queue-status.ts`
+- **Search Tests**: `test-search-integration.ts`, `test-minimal-search.ts`, `test-index-documents.ts`
+- **File Processing Tests**: `test-local-files.ts`, `test-local-files-simple.ts`, `test-quick-fixes.ts`
+- **Job Management Tests**: `test-job-registration.ts`, `test-job-data.ts`, `test-manual-job.ts`
+
+#### Frontend Tests (`packages/frontend/src/tests/`)
+- **Component Tests**: `JobProgressCard.test.tsx`
+- **Integration Tests**: `test-search-integration.ts`
+- **Setup**: `setup.ts`
+
 #### Backend Testing
 ```bash
-# API endpoint testing
-npm run test:backend
+# Run pipeline test
+npm run test:pipeline
+
+# Run all tests with Jest
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage
+npm run test:coverage
 
 # Manual API testing
 curl -X POST http://localhost:3001/api/jobs/collection \
@@ -325,8 +363,17 @@ curl -X POST http://localhost:3001/api/jobs/collection \
 
 #### Frontend Testing
 ```bash
-# Component testing
-npm run test:frontend
+# Run all tests
+npm test
+
+# Run tests with UI
+npm run test:ui
+
+# Run tests with coverage
+npm run test:coverage
+
+# Run tests in watch mode
+npm run test -- --watch
 
 # Visual testing
 npm run storybook
@@ -335,30 +382,109 @@ npm run storybook
 npm run test:e2e
 ```
 
-## 🔒 Environment Configuration
+## 🔒 Environment Configuration & Security
 
-### 🔑 Required Environment Variables
-```bash
-# Required for both agents
-OPENAI_API_KEY=your_api_key_here
-NODE_ENV=development
+### 🚨 **CRITICAL SECURITY GUIDELINES FOR AGENTS**
 
-# Database (Backend)
-DATABASE_URL=postgresql://postgres:postgres123@localhost:5432/datacollector
-REDIS_URL=redis://:redis123@localhost:6379
+#### **⚠️ .ENV FILE ACCESS RESTRICTIONS**
+- **FORBIDDEN**: Agents CANNOT directly read, modify, or access `.env` files for security reasons
+- **FORBIDDEN**: Agents CANNOT use `read_file` tool on `.env` files
+- **FORBIDDEN**: Agents CANNOT modify environment variables or API keys
+- **SAFE ALTERNATIVE**: Use the provided environment configuration module
 
-# Search Services (Backend)
-OPENSEARCH_URL=http://localhost:9200
-CHROMADB_URL=http://localhost:8000
+#### **✅ AGENT-SAFE ENVIRONMENT HANDLING**
 
-# Application (Backend)
-PORT=3001
-FRONTEND_URL=http://localhost:3000
+**1. Use the Environment Configuration Module**
+```typescript
+// ✅ SAFE - Use this in backend code
+import { ENV_CONFIG, ENV_STATUS, getEnvironmentInfo } from './config/environment';
 
-# Frontend
-VITE_API_URL=http://localhost:3001
-VITE_WS_URL=http://localhost:3001
+// ✅ SAFE - Access configuration through module
+const openaiKey = ENV_CONFIG.OPENAI_API_KEY;
+const databaseUrl = ENV_CONFIG.DATABASE_URL;
+
+// ✅ SAFE - Check environment status
+const envInfo = getEnvironmentInfo();
+console.log('Environment ready:', envInfo.hasOpenAIKey);
 ```
+
+**2. Use Environment Validation Script**
+```bash
+# ✅ SAFE - Agents can run this command
+npm run check:env
+# or
+node scripts/check-environment.js
+```
+
+**3. Handle Missing Environment Variables Gracefully**
+```typescript
+// ✅ SAFE - The environment module handles missing .env files
+// It will automatically:
+// - Try multiple .env file locations
+// - Use system environment variables as fallback
+// - Provide default values for development
+// - Warn about missing critical variables
+// - Continue operation when possible
+```
+
+#### **🛠️ ENVIRONMENT TROUBLESHOOTING FOR AGENTS**
+
+**When Environment Issues Occur:**
+1. **First**: Run environment check: `npm run check:env`
+2. **Check**: Environment status through the module:
+   ```typescript
+   import { getEnvironmentHealth } from './config/environment';
+   const health = getEnvironmentHealth();
+   console.log('Environment status:', health.status);
+   ```
+3. **Verify**: Required files exist without accessing .env:
+   ```typescript
+   import { getEnvironmentInfo } from './config/environment';
+   const info = getEnvironmentInfo();
+   console.log('Services configured:', info.servicesConfigured);
+   ```
+
+**Error Messages Agents Might See:**
+- `⚠️ No .env file found` → **OK for agents**, system will use fallbacks
+- `CRITICAL: Missing required environment variables` → Run `npm run check:env` for details
+- `Could not access .env file` → **Normal for agents**, system continues with environment variables
+
+#### **📋 ENVIRONMENT VALIDATION COMMANDS**
+
+```bash
+# ✅ SAFE for agents - Check environment configuration
+npm run check:env                    # Full environment validation
+npm run check:environment            # Alternative command
+node scripts/check-environment.js    # Direct script execution
+
+# ✅ SAFE for agents - Test infrastructure connectivity  
+npm run test:infrastructure          # Test Docker services
+
+# ✅ SAFE for agents - Development commands
+npm run dev:backend                  # Start backend (uses environment module)
+npm run dev:frontend                 # Start frontend
+```
+
+### 🔑 Environment Configuration Details
+
+#### **Environment File Locations** (Auto-detected)
+The environment module automatically searches these locations:
+1. `C:\Users\tomasz\Documents\Programowanie lapek\DataCollector\.env` (Primary)
+2. Project root: `./env`
+3. Relative paths: `../env`, `../../env`
+4. Backend directory: `packages/backend/.env`
+
+#### **Critical Environment Variables**
+- `OPENAI_API_KEY` - **REQUIRED** for AI features
+- `DATABASE_URL` - PostgreSQL connection (has fallback)
+- `REDIS_URL` - Redis connection (has fallback)
+- `OPENSEARCH_URL` - Search service (has fallback)
+- `CHROMADB_URL` - Vector database (has fallback)
+
+#### **Environment Status Indicators**
+- 🟢 **Healthy**: All required variables present
+- 🟡 **Warning**: Using fallback values or missing non-critical variables
+- 🔴 **Error**: Missing critical variables (OPENAI_API_KEY)
 
 ### ✅ Environment Setup Status
 **Environment File**: ✅ **CONFIGURED**
@@ -446,226 +572,26 @@ User Action (Frontend)
 - [React Query](https://tanstack.com/query/latest) - Server state management
 
 ---
-
-## 📋 TODO Management & Task Priorities
-
-### 📍 Main Project Roadmap
-The complete project roadmap is maintained in **`TODO.md`** with detailed phases and timelines. This roadmap is organized into 14 phases spanning infrastructure setup through post-launch maintenance.
-
-### 🎯 Agent-Specific Task Lists
-
-#### 🔧 **Backend Agent Tasks** → See `TODO_BACKEND.md`
-Focus on server-side development, API implementation, job processing, and data infrastructure:
-- ✅ **COMPLETED**: Core AI agent development (LangChain integration)
-- ✅ **COMPLETED**: Asynchronous job processing system  
-- ❌ **CRITICAL MISSING**: Search & storage systems (OpenSearch, ChromaDB)
-- ✅ **COMPLETED**: Backend API development
-- ✅ **COMPLETED**: Infrastructure and monitoring
-
-#### 🎨 **Frontend Agent Tasks** → See `TODO_FRONTEND.md`  
-Focus on user interface, real-time updates, and user experience:
-- React application development
-- Real-time job monitoring interface
-- Search and results display
-- Component library and design system
-- Frontend optimization and testing
-
-### 🚀 Current Sprint Priorities
-
-#### Phase 2-3: Core AI Agent Development (✅ COMPLETED - Backend)
-```typescript
-// ✅ COMPLETED - Backend Agent
-[✅] LangChain Integration
-[✅] Data Collection Agent implementation  
-[✅] Web scraping infrastructure with Playwright
-[✅] Content discovery and filtering logic
-
-// ✅ COMPLETED - Required for Frontend
-[✅] Job processing API endpoints
-[✅] WebSocket real-time status updates
-```
-
-#### Phase 6: Search & Storage Systems (🔥 CRITICAL MISSING - Backend)
-```typescript
-// 🔥 URGENT - Backend Agent
-[ ] OpenSearch integration for full-text search
-[ ] ChromaDB integration for vector embeddings
-[ ] Hybrid search engine implementation
-[ ] Document indexing pipeline
-
-// DEPENDENCY - Required for Frontend
-[ ] Search API endpoints with hybrid results
-[ ] Document retrieval and display capabilities
-```
-
-#### Phase 3: File Processing Pipeline (🔥 CRITICAL MISSING - Backend)
-```typescript
-// 🔥 URGENT - Backend Agent
-[ ] Content downloader with multi-threading
-[ ] File processing system (PDF, Word, CSV, JSON)
-[ ] Text extraction and chunking
-[ ] Embedding generation pipeline
-
-// DEPENDENCY - Required for Frontend
-[ ] Document viewer and download capabilities
-[ ] File upload and processing interface
-```
-
-### 🔄 Daily Workflow Integration
-
-#### 1. **Morning Standup (Both Agents)**
-```bash
-# Check current tasks and priorities
-cat TODO_BACKEND.md | grep "🔥\|⚡"     # Backend priorities  
-cat TODO_FRONTEND.md | grep "🔥\|⚡"    # Frontend priorities
-grep -n "DEPENDENCY\|BLOCKER" TODO_*.md  # Shared blockers
-
-# Check for critical issues
-grep -n "URGENT\|CRITICAL" TODO_BACKEND.md
-```
-
-#### 2. **Before Starting Work (Each Agent)**
-- Review your agent-specific TODO file
-- Check for new `🔥 HIGH PRIORITY` or `⚡ URGENT` tasks
-- Verify dependencies are met in the other agent's TODO
-- Update task status: `[ ]` → `[🚧]` → `[✅]`
-
-#### 3. **End of Day (Both Agents)**
-- Mark completed tasks as `[✅]` in appropriate TODO file
-- Add new tasks discovered during development
-- Update dependencies and blockers
-- Sync progress in this context file
-
-### 📊 Task Status Conventions
-
-| Symbol | Meaning | When to Use |
-|--------|---------|-------------|
-| `[ ]` | Not started | Default state for new tasks |
-| `[🚧]` | In progress | Currently working on |
-| `[✅]` | Completed | Task finished and tested |
-| `[❌]` | Cancelled | Task no longer needed |
-| `[🔥]` | High priority | Critical path items |
-| `[⚡]` | Urgent | Blocking other work |
-| `[📋]` | Needs planning | Requires breakdown |
-| `[🤝]` | Collaboration needed | Requires both agents |
-
-### 🎯 Milestone Tracking
-
-#### **Current Milestone**: Phase 6 Implementation (Search & Storage)
-**Target**: Complete search infrastructure and file processing
-**Estimated Completion**: [Update weekly]
-
-**Backend Progress** (Updated by Backend Agent):
-- [✅] 🔥 LangChain integration [✅]
-- [✅] 🔥 Data collection agent [✅]  
-- [✅] ⚡ Job queue system [✅]
-- [✅] WebSocket real-time updates [✅]
-- [✅] TypeScript compilation errors [✅] **JUST COMPLETED**
-- [✅] Database migration system [✅] **JUST COMPLETED**
-- [✅] Job management API [✅] **JUST COMPLETED**
-- [ ] 🔥 OpenSearch integration [🚧 URGENT]
-- [ ] 🔥 ChromaDB integration [🚧 URGENT]
-- [ ] 🔥 File processing pipeline [🚧 URGENT]
-
-**Frontend Progress** (Updated by Frontend Agent):
-- [ ] 🔥 Job monitoring interface [📋]
-- [ ] Real-time progress components [📋]
-- [ ] Search UI components [📋]
-- [ ] WebSocket client integration [📋]
-
-**Shared Dependencies**:
-- [ ] 🤝 Search API contract finalization [🚧 URGENT]
-- [ ] 🤝 Document processing integration [🚧 URGENT]
-- [ ] Infrastructure health validation [✅]
-
-### 🚨 Critical Task Coordination
-
-#### **Search Infrastructure** (Backend → Frontend dependency)
-```typescript
-// Backend Agent MUST complete first:
-1. Implement OpenSearch service for full-text search
-2. Implement ChromaDB service for vector search
-3. Create hybrid search engine
-4. Update search API endpoints
-5. Update this context file with search capabilities
-
-// Then Frontend Agent can:
-1. Implement search interface components
-2. Add search result display
-3. Create document viewer
-4. Add search filters and facets
-```
-
-#### **File Processing** (Backend → Frontend dependency)
-```typescript
-// Backend Agent MUST complete first:
-1. Implement content downloader
-2. Create file processing pipeline
-3. Add document parsing services
-4. Implement embedding generation
-5. Update document API endpoints
-
-// Then Frontend Agent can:
-1. Add file upload interface
-2. Create document viewer
-3. Implement download functionality
-4. Add processing progress display
-```
-
-#### **Type Safety** (Shared responsibility)
-```typescript
-// Process for type changes:
-1. Backend Agent: Update types/api.ts
-2. Backend Agent: Update exports and documentation
-3. Frontend Agent: Import updated types
-4. Frontend Agent: Update components using changed types
-5. Both: Test integration and update TODO status
-```
-
----
-
 ## 🎯 Current Development Status
 
 ### ✅ Completed
-- [x] Project structure and architecture
-- [x] Type definitions for API contracts
-- [x] Docker infrastructure setup
-- [x] Express.js server structure with TypeScript
-- [x] React application foundation
-- [x] Database schema planning and implementation
-- [x] **Environment configuration** (OpenAI API key and all services configured)
-- [x] **LangChain integration and AI agent development**
-- [x] **Job processing system with Bull.js**
-- [x] **WebSocket real-time updates**
-- [x] **Google Scholar scraper implementation**
-- [x] **REST API endpoints for job management**
-- [x] **TypeScript compilation errors fixed** (29 errors resolved - 17 backend + 12 frontend)
-- [x] **Database migration system implemented**
-- [x] **Job persistence and API functionality verified**
-- [x] **Test data integration** (Mental health transcriptions from Healthy Gamer/Dr. K)
+- [x] **Project Structure and Architecture**: A clear and scalable monorepo structure is in place.
+- [x] **Type Definitions**: Shared API contracts and type definitions are well-defined.
+- [x] **Docker Infrastructure**: All services (PostgreSQL, Redis, OpenSearch, ChromaDB) are containerized and operational.
+- [x] **Backend Server**: The Express.js server is fully functional with robust middleware and error handling.
+- [x] **Job Processing System**: An asynchronous job processing system with a queue and state management is implemented.
+- [x] **Search Services**: A hybrid search engine combining OpenSearch and ChromaDB is fully functional.
+- [x] **Frontend Foundation**: The React application is set up with routing, state management, and API integration.
 
 ### 🚧 In Progress
-- [ ] **Search services implementation** (OpenSearch + ChromaDB) 🔥 **NEXT PRIORITY**
-- [ ] **File processing pipeline** 🔥 **NEXT PRIORITY**
-- [ ] **Additional scrapers** (PubMed, arXiv) 📋 **PLANNED**
+- [ ] **UI/UX Refinement**: The frontend is functional but requires further improvements to the search results display and overall user experience.
+- [ ] **Additional Scrapers**: The backend is designed for extensibility, with new scrapers for PubMed and arXiv planned.
+- [ ] **Testing Coverage**: While a testing framework is in place, more comprehensive unit and integration tests are needed.
 
 ### 📋 TODO
-- [ ] **Authentication system**
-- [ ] **Advanced search filters**
-- [ ] **Document viewer**
-- [ ] **Admin dashboard**
-- [ ] **Performance optimization**
-- [ ] **Production deployment**
-- [ ] **Mental health content processing** (Test data from Transcriptions_All folder)
-
-### ✅ Critical Issues Resolved
-1. **TypeScript compilation errors** in all services ✅ **FIXED** (29 errors resolved - 17 backend + 12 frontend)
-2. **Missing search services** (OpenSearch, ChromaDB) 🔥 **NEXT PRIORITY**
-3. **Missing file processing pipeline** 🔥 **NEXT PRIORITY**
-4. **Missing database migration scripts** ✅ **FIXED**
-5. **Missing additional scrapers** (PubMed, arXiv) 📋 **PLANNED**
-6. **Test data integration** ✅ **COMPLETED** (Mental health transcriptions from Healthy Gamer/Dr. K)
-
+- [ ] **Document Viewer**: The document viewer needs to be integrated with the backend to display real processed files.
+- [ ] **Authentication**: A complete authentication system with protected routes and user management is yet to be implemented.
+- [ ] **Monitoring and Observability**: Integration with monitoring tools like Grafana, Loki, and Prometheus is planned.
+- [ ] **Performance Optimization**: Further optimization of both frontend and backend for production use.
 ---
-
 **🤖 Remember**: This file is your single source of truth for coordination. Update it when you make significant changes that affect the other agent! 

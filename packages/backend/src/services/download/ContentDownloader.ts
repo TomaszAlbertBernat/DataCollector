@@ -177,6 +177,18 @@ export class ContentDownloader {
         const contentLength = parseInt(response.headers['content-length'] || '0');
         const mimeType = response.headers['content-type'] || mime.lookup(url) || 'application/octet-stream';
 
+        // Validate that we got a PDF if the URL suggests it should be a PDF
+        const urlLower = url.toLowerCase();
+        const isExpectedPDF = urlLower.includes('.pdf') || urlLower.includes('pdf');
+        const isActualPDF = mimeType.includes('application/pdf') || mimeType.includes('pdf');
+        
+        if (isExpectedPDF && !isActualPDF) {
+          return {
+            success: false,
+            error: `Expected PDF but got ${mimeType}. URL may redirect to HTML page.`
+          };
+        }
+
         // Check file size limit
         if (contentLength > 0 && contentLength > (this.options.maxFileSize || 0)) {
           return {

@@ -46,12 +46,14 @@ export class JobQueue {
   private config: JobQueueConfig;
   private logger: winston.Logger;
   private redisClient: RedisClientType;
+  private stateManager?: any; // JobStateManager
   private initialized = false;
 
-  constructor(config: JobQueueConfig, redisClient: RedisClientType, logger: winston.Logger) {
+  constructor(config: JobQueueConfig, redisClient: RedisClientType, logger: winston.Logger, stateManager?: any) {
     this.config = config;
     this.redisClient = redisClient;
     this.logger = logger;
+    this.stateManager = stateManager;
   }
 
   /**
@@ -125,6 +127,26 @@ export class JobQueue {
         removeOnFail: 50 // Keep last 50 failed jobs
       };
 
+      // Create job in database if state manager is available
+      if (this.stateManager) {
+        try {
+          await this.stateManager.createJob({
+            id: jobData.id,
+            type: jobData.type,
+            query: jobData.query,
+            userId: jobData.userId,
+            metadata: jobData.metadata
+          });
+          this.logger.debug('Job created in database', { jobId: jobData.id });
+        } catch (error) {
+          this.logger.error('Failed to create job in database', {
+            jobId: jobData.id,
+            error: (error as Error).message
+          });
+          // Continue with queue submission even if database creation fails
+        }
+      }
+
       // Submit job to queue
       const bullJob = await queue.add(jobData.type, jobData, jobOptions);
 
@@ -133,7 +155,7 @@ export class JobQueue {
       const estimatedStartTime = this.estimateStartTime(jobData.type, queuePosition);
 
       const result: JobSubmissionResult = {
-        jobId: bullJob.id.toString(),
+        jobId: jobData.id, // Return the original UUID, not Bull.js ID
         ...(queuePosition !== undefined && { queuePosition }),
         ...(estimatedStartTime && { estimatedStartTime })
       };

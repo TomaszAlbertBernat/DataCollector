@@ -1,5 +1,6 @@
 import { ChromaClient, Collection } from 'chromadb';
 import winston from 'winston';
+import { EmbeddingGenerator } from '../ai/EmbeddingGenerator';
 
 export interface ChromaDBConfig {
   url: string;
@@ -43,10 +44,12 @@ export class ChromaDBService {
   private collection: Collection | null = null;
   private logger: winston.Logger;
   private config: ChromaDBConfig;
+  private embeddingGenerator: EmbeddingGenerator;
   private initialized = false;
 
-  constructor(config: ChromaDBConfig, logger: winston.Logger) {
+  constructor(config: ChromaDBConfig, embeddingGenerator: EmbeddingGenerator, logger: winston.Logger) {
     this.config = config;
+    this.embeddingGenerator = embeddingGenerator;
     this.logger = logger;
     
     this.client = new ChromaClient({
@@ -104,16 +107,53 @@ export class ChromaDBService {
       const ids = documents.map(doc => doc.id);
       const contents = documents.map(doc => doc.content);
       const metadatas = documents.map(doc => doc.metadata);
-      const embeddings = documents.map(doc => doc.embedding).filter(Boolean) as number[][];
+      
+      // Generate embeddings using our OpenAI service
+      let embeddings: number[][] = [];
+      if (documents.some(doc => !doc.embedding)) {
+        // Generate embeddings for documents that don't have them
+        const textsToEmbed = documents
+          .filter(doc => !doc.embedding)
+          .map(doc => doc.content);
+        
+        if (textsToEmbed.length > 0) {
+          const embeddingResult = await this.embeddingGenerator.generateEmbeddings(textsToEmbed);
+          if (embeddingResult.success && embeddingResult.embeddings) {
+            embeddings = embeddingResult.embeddings;
+          } else {
+            throw new Error(`Failed to generate embeddings: ${embeddingResult.error}`);
+          }
+        }
+      }
+      
+      // Combine provided embeddings with generated ones
+      const finalEmbeddings: number[][] = [];
+      let generatedIndex = 0;
+      
+      for (const doc of documents) {
+        if (doc.embedding) {
+          finalEmbeddings.push(doc.embedding);
+        } else if (generatedIndex < embeddings.length) {
+          const embedding = embeddings[generatedIndex];
+          if (embedding) {
+            finalEmbeddings.push(embedding);
+            generatedIndex++;
+          } else {
+            throw new Error(`Generated embedding is null for document ${doc.id}`);
+          }
+        } else {
+          throw new Error(`Missing embedding for document ${doc.id}`);
+        }
+      }
 
       await this.collection.add({
         ids,
         documents: contents,
         metadatas,
-        ...(embeddings.length > 0 && { embeddings }),
+        embeddings: finalEmbeddings,
       });
 
-      this.logger.info(`Added ${documents.length} documents to ChromaDB`);
+      this.logger.info(`Added ${documents.length} documents to ChromaDB with embeddings`);
     } catch (error) {
       this.logger.error('Failed to add documents to ChromaDB:', error as Error);
       throw error;
@@ -337,7 +377,8 @@ export class ChromaDBService {
 
 export const createChromaDBService = (
   config: ChromaDBConfig,
+  embeddingGenerator: EmbeddingGenerator,
   logger: winston.Logger
 ): ChromaDBService => {
-  return new ChromaDBService(config, logger);
+  return new ChromaDBService(config, embeddingGenerator, logger);
 }; 

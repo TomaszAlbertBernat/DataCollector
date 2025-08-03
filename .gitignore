@@ -252,4 +252,8 @@ dump.rdb
 
 # PostgreSQL
 *.dump
-*.sql.backup 
+*.sql.backup
+
+# TODO files
+TODO.md
+TODO_*.md 

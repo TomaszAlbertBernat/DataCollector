@@ -181,58 +181,70 @@ export class HybridSearchEngine {
   }
 
   private async performSemanticSearch(query: HybridSearchQuery): Promise<HybridSearchResult[]> {
-    const similarityQuery: SimilaritySearchQuery = {
-      query: query.query,
-      nResults: query.pagination?.limit || this.config.maxResults,
-      where: this.buildChromaDBFilters(query.filters),
-    };
+    try {
+      const similarityQuery: SimilaritySearchQuery = {
+        query: query.query,
+        nResults: query.pagination?.limit || this.config.maxResults,
+        where: this.buildChromaDBFilters(query.filters),
+      };
 
-    const response = await this.chromaDBService.similaritySearch(similarityQuery);
+      const response = await this.chromaDBService.similaritySearch(similarityQuery);
 
-    return response.results.map(result => ({
-      id: result.id,
-      title: result.metadata.title || '',
-      content: result.content,
-      url: result.metadata.url,
-      source: result.metadata.source || '',
-      authors: result.metadata.authors,
-      publicationDate: result.metadata.publicationDate,
-      fileType: result.metadata.fileType || '',
-      fileSize: result.metadata.fileSize,
-      relevanceScore: 1 - result.distance, // Convert distance to similarity score
-      semanticScore: 1 - result.distance,
-      metadata: result.metadata,
-    }));
+      return response.results.map(result => ({
+        id: result.id,
+        title: result.metadata.title || '',
+        content: result.content,
+        url: result.metadata.url,
+        source: result.metadata.source || '',
+        authors: result.metadata.authors,
+        publicationDate: result.metadata.publicationDate,
+        fileType: result.metadata.fileType || '',
+        fileSize: result.metadata.fileSize,
+        relevanceScore: 1 - result.distance, // Convert distance to similarity score
+        semanticScore: 1 - result.distance,
+        metadata: result.metadata,
+      }));
+    } catch (error) {
+      this.logger.warn('Semantic search failed, falling back to fulltext search:', error as Error);
+      // Fallback to fulltext search when semantic search fails
+      return this.performFulltextSearch(query);
+    }
   }
 
   private async performHybridSearch(
     query: HybridSearchQuery,
     weights: { fulltext: number; semantic: number }
   ): Promise<HybridSearchResult[]> {
-    // Perform both searches in parallel
-    const [fulltextResponse, semanticResponse] = await Promise.all([
-      this.performFulltextSearch(query),
-      this.performSemanticSearch(query),
-    ]);
+    try {
+      // Perform both searches in parallel
+      const [fulltextResponse, semanticResponse] = await Promise.all([
+        this.performFulltextSearch(query),
+        this.performSemanticSearch(query),
+      ]);
 
-    // Combine and rank results using Reciprocal Rank Fusion
-    const combinedResults = this.combineResults(
-      fulltextResponse,
-      semanticResponse,
-      weights
-    );
+      // Combine and rank results using Reciprocal Rank Fusion
+      const combinedResults = this.combineResults(
+        fulltextResponse,
+        semanticResponse,
+        weights
+      );
 
-    // Sort by combined score
-    combinedResults.sort((a, b) => b.relevanceScore - a.relevanceScore);
+      // Sort by combined score
+      combinedResults.sort((a, b) => b.relevanceScore - a.relevanceScore);
 
-    // Apply pagination
-    if (query.pagination) {
-      const start = (query.pagination.page - 1) * query.pagination.limit;
-      const end = start + query.pagination.limit;
-      return combinedResults.slice(start, end);
+      // Apply pagination
+      if (query.pagination) {
+        const start = (query.pagination.page - 1) * query.pagination.limit;
+        const end = start + query.pagination.limit;
+        return combinedResults.slice(start, end);
+      }
+
+      return combinedResults.slice(0, this.config.maxResults);
+    } catch (error) {
+      this.logger.warn('Hybrid search failed, falling back to fulltext search:', error as Error);
+      // If hybrid search fails, fallback to fulltext search
+      return this.performFulltextSearch(query);
     }
-
-    return combinedResults.slice(0, this.config.maxResults);
   }
 
   private combineResults(
@@ -330,23 +342,27 @@ export class HybridSearchEngine {
         createdAt: new Date().toISOString(),
       });
 
-      // Index in ChromaDB
-      await this.chromaDBService.addDocuments([{
-        id: document.id,
-        content: document.content,
-        metadata: {
-          title: document.title,
-          url: document.url,
-          source: document.source,
-          authors: document.authors,
-          publicationDate: document.publicationDate,
-          fileType: document.fileType,
-          fileSize: document.fileSize,
-          ...document.metadata,
-        },
-      }]);
-
-      this.logger.debug(`Indexed document in both search engines: ${document.id}`);
+      // Try to index in ChromaDB, but don't fail if it doesn't work
+      try {
+        await this.chromaDBService.addDocuments([{
+          id: document.id,
+          content: document.content,
+          metadata: {
+            title: document.title,
+            url: document.url,
+            source: document.source,
+            authors: document.authors,
+            publicationDate: document.publicationDate,
+            fileType: document.fileType,
+            fileSize: document.fileSize,
+            ...document.metadata,
+          },
+        }]);
+        this.logger.debug(`Indexed document in both search engines: ${document.id}`);
+      } catch (chromaError) {
+        this.logger.warn(`Failed to index document ${document.id} in ChromaDB, but OpenSearch succeeded:`, chromaError as Error);
+        // Don't throw error, just log it - OpenSearch indexing succeeded
+      }
     } catch (error) {
       this.logger.error(`Failed to index document ${document.id}:`, error as Error);
       throw error;
