@@ -367,7 +367,7 @@ export class PubMedScraper extends BaseScraper {
       
       // Extract journal
       const journalMatch = infoText.match(/Journal: ([^.]+)/);
-      if (journalMatch) {
+      if (journalMatch && journalMatch[1]) {
         info.journal = journalMatch[1].trim();
       }
       
@@ -401,7 +401,7 @@ export class PubMedScraper extends BaseScraper {
       const doiText = doiElement ? await doiElement.textContent() || '' : '';
       
       const match = doiText.match(/DOI: (.+)/);
-      return match ? match[1].trim() : undefined;
+      return match && match[1] ? match[1].trim() : undefined;
     } catch (error) {
       return undefined;
     }
