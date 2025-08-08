@@ -27,7 +27,10 @@
     "test:infrastructure": "node scripts/test-infrastructure.js",
     "check:env": "node scripts/check-environment.js",
     "check:environment": "node scripts/check-environment.js",
-    "typecheck": "npm run typecheck --workspaces"
+    "typecheck": "npm run typecheck --workspaces",
+    "e2e:install": "npm -w . i -D @playwright/test && npx playwright install --with-deps | cat",
+    "test:e2e": "BASE_URL=${BASE_URL:-http://localhost:3001} npx playwright test -c e2e/playwright.config.ts | cat",
+    "perf:smoke": "BASE_URL=${BASE_URL:-http://localhost:3001} k6 run scripts/perf/search-smoke.js"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^6.0.0",
