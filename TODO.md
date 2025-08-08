@@ -46,15 +46,15 @@
 
 ### **🔧 INFRASTRUCTURE - Testing & Monitoring** (Days 9-12)
 
-#### 5. **Expand Test Coverage** 🔄 **MAJOR ACHIEVEMENT**
-- **Backend**: ✅ **MASSIVE EXPANSION** - Multiple API routes fully tested
-  - **Jobs API route**: 13 tests, 73.52% coverage ✅
-  - **Search API route**: 22 tests, comprehensive coverage ✅ **NEW**
-  - **Documents API route**: 21 tests, comprehensive coverage ✅ **NEW**
+#### 5. **Expand Test Coverage** ✅ **MAJOR ACHIEVEMENT**
+- **Backend**: ✅ Multiple API routes and services fully tested
+  - **Jobs API route**: 13 tests
+  - **Search API route**: 22 tests
+  - **Documents API route**: 21 tests
+  - **Upload API route**: 15 tests
   - **Core Services**: ArXiv, BaseScraper, Environment, JobProcessor, ScraperManager ✅
-  - **Current**: **100 passing tests** across **8 test suites** 🎉
-  - **Coverage Progress**: From 15.47% → **Significantly Improved** 
-  - **Next**: Upload routes + Additional core services testing
+  - **Current**: **115 tests** across **9** test suites
+  - **Next**: Add tests for `MetricsService`, `JobQueue`, `JobStateManager`; AI and search service units
 - **Frontend**: Add more component and integration tests in `packages/frontend/src/tests`.
 - **Goal**: Achieve at least 70% test coverage across the application.
 
@@ -64,6 +64,71 @@
 - **Backend**: Implement health checks and metrics endpoints.
 - **Frontend**: Add error tracking and performance monitoring.
 - **Status**: ✅ **COMPLETED** - Full monitoring stack operational with Grafana dashboards, Prometheus metrics, and health check endpoints
+
+---
+## Unified TODO (Merged Backend + Frontend)
+
+### Backend
+- **Completed**
+  - Core infrastructure running: PostgreSQL, Redis, OpenSearch, ChromaDB
+  - AI integration: OpenAI + LangChain + embedding generator available
+  - Job processing: queues, state manager, processor, graceful shutdown
+  - Search services: OpenSearch, ChromaDB, Hybrid engine wired into API
+  - API routes: Jobs, Search, Documents, Upload implemented
+
+- **Testing & Monitoring**
+  - Test suites: 9; Tests: 115 total
+  - Routes covered: Jobs (13), Search (22), Documents (21), Upload (15)
+  - Core services covered: JobProcessor (7), ScraperManager (10), ArXivScraper (14), BaseScraper (6), environment (7)
+  - Next: add tests for `MetricsService`, `JobQueue`, `JobStateManager`, AI services, search services
+
+- **Scrapers**
+  - PubMed and arXiv scrapers complete and integrated via `ScraperManager`
+
+- **Observability**
+  - Metrics service and endpoints (`/metrics`, `/metrics/services`, `/metrics/prometheus`)
+  - Dockerized Prometheus, Grafana, Loki, Promtail; dashboard provisioned
+
+- **Core Infrastructure**
+  - TS compile fixed; DB migrations implemented; Job management API verified
+  - Job processor integration fixed (registration order, services, health checks)
+  - Pipeline tests created; file processing partial; embeddings ready when inputs available
+  - Search infra complete (OpenSearch, ChromaDB, Hybrid engine); Search API fully tested
+
+- **Current Backend Status**
+  - Server on 3001; DB migrations applied; Bull queues operational; processor healthy
+  - OpenAI/LangChain integrated; scrapers ready; search services initialized when embeddings available
+
+- **Next (Backend)**
+  - Implement real data source for Documents API (replace mock/demo with DB/FS-backed content)
+  - Expand tests for `MetricsService`, `JobQueue`, `JobStateManager`, AI + search service units
+  - Solidify end-to-end pipeline for processing/indexing uploaded and scraped documents
+
+### Frontend
+- **Completed**
+  - Core infra: React+TS+Vite, Tailwind, Router, Zustand, TanStack Query, WebSockets
+  - Pages/Components: Home, Jobs, Job Details, Search, JobProgressCard, DocumentViewer, JobCreationForm, Layout
+  - API integration: Jobs, Search (real API with graceful fallback), Documents
+  - UI/UX: Document viewer wired to real endpoints (PDF viewer placeholder), enhanced search results with highlighting/pagination
+
+- **Testing & QA**
+  - Initial coverage in `src/tests`: `DocumentViewer.test.tsx`, `JobProgressCard.test.tsx`
+  - Integration script: `test-search-integration.ts`
+  - Next: expand component/page/API tests toward ≥70% coverage
+
+- **Upcoming Features**
+  - UI/UX improvements: responsive, accessibility, dark mode, component library (DataTable, Advanced filters, Upload), loading states, toasts
+  - Search & discovery: history/saved searches, sorting, advanced filters, export, analytics
+  - Analytics & monitoring: job analytics, system health, infra status, performance metrics, error tracking
+  - Security & auth: user auth, profiles, RBAC, sessions
+  - Testing: component/page, integration (API, WebSockets, errors), E2E workflows
+  - Performance: code splitting, lazy loading, bundle analysis, caching; load testing
+  - Mobile/PWA: touch, nav, PWA features, offline
+  - Dev infra: TS strict, ESLint/Prettier, build optimization, Docker, CI/CD
+  - Docs: Storybook, API docs, user guides, developer docs
+
+- **Current Frontend Status**
+  - MVP complete; real API integration with graceful fallback; real-time updates; document viewing with download
 
 ---
 
@@ -89,9 +154,13 @@ docker-compose logs -f        # Monitor logs
 
 # Testing
 cd packages/backend
-npm run test:integration      # Run integration tests
+npm test                      # Run backend unit/integration tests
+npm run test:coverage         # Run backend tests with coverage
+npm run test:pipeline         # Run simple pipeline integration script
+
 cd packages/frontend  
-npm run test:e2e             # Run end-to-end tests
+npm test                      # Run frontend tests
+npm run test:coverage         # Run frontend tests with coverage
 ```
 
 ---
@@ -106,9 +175,9 @@ npm run test:e2e             # Run end-to-end tests
 - [✅] Real-time job updates work reliably
 
 ### **Feature Completion**
-- [✅] Hybrid search working end-to-end (frontend → backend → results)
-- [✅] Document viewer displays real processed files
-- [✅] Authentication flow complete (login → protected routes → logout)
+- [✅] Search API implemented and tested (frontend integrates with fallback to demo mode when backend search is unavailable)
+- [✅] Document viewer wired to backend document endpoints (currently serving demo/mock data; PDF viewer placeholder in UI)
+- [ ] Authentication flow (login → protected routes → logout)
 - [✅] PubMed/arXiv scrapers operational
 - [✅] Monitoring dashboard live
 

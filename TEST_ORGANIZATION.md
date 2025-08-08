@@ -163,8 +163,7 @@ npm run test -- --watch
 
 ### Context Updates
 - ✅ `CURSOR_AGENTS_CONTEXT.md` - Updated with new test structure
-- ✅ `TODO_BACKEND.md` - Added test organization completion
-- ✅ `TODO_FRONTEND.md` - Added test organization completion
+- ✅ `TODO.md` - Unified TODO reflects current test organization
 
 ## 🎯 Benefits
 

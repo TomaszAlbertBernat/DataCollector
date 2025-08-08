@@ -92,8 +92,8 @@ npm run dev
 
 1. **Always reference** `CURSOR_AGENTS_CONTEXT.md` before making changes
 2. **Check your agent-specific TODO file** for current sprint priorities:
-   - **Backend Agent**: Review `TODO_BACKEND.md` for backend tasks
-   - **Frontend Agent**: Review `TODO_FRONTEND.md` for frontend tasks
+  - **Backend Agent**: Review unified `TODO.md` for backend tasks
+  - **Frontend Agent**: Review unified `TODO.md` for frontend tasks
 3. **Backend Agent** updates API types in `packages/backend/src/types/api.ts` FIRST
 4. **Frontend Agent** uses those types for consistency
 5. **Both agents** update the context file when making breaking changes
@@ -112,14 +112,13 @@ npm run dev
 ### 📋 **TODO Management & Daily Workflow**
 
 #### **Agent-Specific Task Lists**
-- **Backend Agent**: Focus on `TODO_BACKEND.md` - API, jobs, AI services, database
-- **Frontend Agent**: Focus on `TODO_FRONTEND.md` - React UI, real-time updates, UX
+- **Backend Agent**: Focus on `TODO.md` (backend section) - API, jobs, AI services, database
+- **Frontend Agent**: Focus on `TODO.md` (frontend section) - React UI, real-time updates, UX
 
 #### **Daily Workflow Commands**
 ```bash
 # Morning Standup (Check Priorities)
-cat TODO_BACKEND.md | grep "🔥\|⚡"     # Backend priorities  
-cat TODO_FRONTEND.md | grep "🔥\|⚡"    # Frontend priorities
+cat TODO.md | grep "Unified TODO" -n    # Jump to merged section
 grep -n "DEPENDENCY\|BLOCKER" TODO_*.md  # Shared blockers
 
 # During Development (Update Status)
@@ -165,13 +164,13 @@ I'm the BACKEND agent for DataCollector. I focus on:
 - Database operations and AI service integration
 - WebSocket real-time updates
 
-My current sprint priorities (from TODO_BACKEND.md):
+My current sprint priorities (from TODO.md backend section):
 🔥 LangChain integration and AI agent development
 🔥 Job queue setup with Bull.js  
 ⚡ Core API endpoints for job management
 
 Please help me [your specific backend task]. 
-Check CURSOR_AGENTS_CONTEXT.md for API contracts and TODO_BACKEND.md for current priorities.
+Check `CURSOR_AGENTS_CONTEXT.md` for API contracts and `TODO.md` for current priorities.
 ```
 
 ### Frontend Agent Prompt Example:
@@ -182,13 +181,13 @@ I'm the FRONTEND agent for DataCollector. I focus on:
 - Tailwind CSS styling and responsive design
 - Socket.io client for real-time updates
 
-My current sprint priorities (from TODO_FRONTEND.md):
+My current sprint priorities (from TODO.md frontend section):
 🔥 Job management dashboard with real-time updates
 🔥 React Router and TanStack Query setup
 ⚡ WebSocket integration for live progress
 
 Please help me [your specific frontend task].
-Use types from packages/backend/src/types/api.ts and check TODO_FRONTEND.md for current priorities.
+Use types from `packages/backend/src/types/api.ts` and check `TODO.md` for current priorities.
 ```
 
 ## 🔍 Monitoring Both Agents
